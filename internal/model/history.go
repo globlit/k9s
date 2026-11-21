@@ -113,7 +113,7 @@ func (h *History) popN(n int) bool {
 
 // Push adds a new item.
 func (h *History) Push(c string) {
-	if c == "" || len(h.commands) >= h.limit {
+	if c == "" || h.limit <= 0 {
 		return
 	}
 	if t, ok := h.Top(); ok && t == c {
@@ -122,6 +122,10 @@ func (h *History) Push(c string) {
 
 	if h.currentIdx < len(h.commands)-1 {
 		h.commands = h.commands[:h.currentIdx+1]
+	}
+	// Full: drop the oldest entry rather than ignoring new commands.
+	if len(h.commands) >= h.limit {
+		h.commands = append(h.commands[:0], h.commands[len(h.commands)-h.limit+1:]...)
 	}
 	h.commands = append(h.commands, c)
 	h.currentIdx = len(h.commands) - 1

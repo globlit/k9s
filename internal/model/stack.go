@@ -104,15 +104,17 @@ func (s *Stack) Push(c Component) {
 
 // Pop removed the top item and returns it.
 func (s *Stack) Pop() (Component, bool) {
-	if s.Empty() {
+	s.mx.Lock()
+	n := len(s.components)
+	if n == 0 {
+		s.mx.Unlock()
 		return nil, false
 	}
-
-	var c Component
-	s.mx.Lock()
-	c = s.components[len(s.components)-1]
+	c := s.components[n-1]
 	c.Stop()
-	s.components = s.components[:len(s.components)-1]
+	// Clear the slot so the popped view (and its table data) can be collected.
+	s.components[n-1] = nil
+	s.components = s.components[:n-1]
 	s.mx.Unlock()
 
 	s.notify(StackPop, c)
@@ -145,29 +147,36 @@ func (s *Stack) Empty() bool {
 
 // IsLast indicates if stack only has one item left.
 func (s *Stack) IsLast() bool {
+	s.mx.RLock()
+	defer s.mx.RUnlock()
+
 	return len(s.components) == 1
 }
 
 // Previous returns the previous component if any.
 func (s *Stack) Previous() Component {
-	if s.Empty() {
-		return nil
-	}
-	if s.IsLast() {
-		return s.Top()
-	}
+	s.mx.RLock()
+	defer s.mx.RUnlock()
 
-	return s.components[len(s.components)-2]
+	switch n := len(s.components); n {
+	case 0:
+		return nil
+	case 1:
+		return s.components[0]
+	default:
+		return s.components[n-2]
+	}
 }
 
 // Top returns the top most item or nil if the stack is empty.
 func (s *Stack) Top() Component {
-	if s.Empty() {
+	s.mx.RLock()
+	defer s.mx.RUnlock()
+
+	if len(s.components) == 0 {
 		return nil
 	}
 
-	s.mx.RLock()
-	defer s.mx.RUnlock()
 	return s.components[len(s.components)-1]
 }
 

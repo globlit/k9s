@@ -7,6 +7,8 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"github.com/derailed/k9s/internal"
 )
 
 const (
@@ -85,7 +87,7 @@ func (c *CmdBuff) SetActive(b bool) {
 	c.active = b
 	c.mx.Unlock()
 
-	c.fireActive(c.active)
+	c.fireActive(b)
 }
 
 // GetText returns the current text.
@@ -156,6 +158,7 @@ func (c *CmdBuff) Add(r rune) {
 	c.setCancel(cancel)
 
 	go func() {
+		defer internal.LogPanic("cmd buffer")
 		<-ctx.Done()
 		c.fireBufferCompleted(c.GetText(), c.GetSuggestion())
 		c.resetCancel()
@@ -164,10 +167,14 @@ func (c *CmdBuff) Add(r rune) {
 
 // Delete removes the last character from the buffer.
 func (c *CmdBuff) Delete() {
-	if c.Empty() {
+	c.mx.RLock()
+	if len(c.buff) == 0 {
+		c.mx.RUnlock()
 		return
 	}
-	c.SetText(string(c.buff[:len(c.buff)-1]), "", true)
+	text := string(c.buff[:len(c.buff)-1])
+	c.mx.RUnlock()
+	c.SetText(text, "", true)
 	c.fireBufferChanged(c.GetText(), c.GetSuggestion())
 	if c.hasCancel() {
 		return
@@ -177,6 +184,7 @@ func (c *CmdBuff) Delete() {
 	c.setCancel(cancel)
 
 	go func() {
+		defer internal.LogPanic("cmd buffer")
 		<-ctx.Done()
 		c.fireBufferCompleted(c.GetText(), c.GetSuggestion())
 		c.resetCancel()
@@ -226,20 +234,33 @@ func (c *CmdBuff) RemoveListener(l BuffWatcher) {
 	c.mx.Unlock()
 }
 
-func (c *CmdBuff) fireBufferCompleted(t, s string) {
+func (c *CmdBuff) snapshotListeners() []BuffWatcher {
+	c.mx.RLock()
+	defer c.mx.RUnlock()
+
+	ll := make([]BuffWatcher, 0, len(c.listeners))
 	for l := range c.listeners {
+		ll = append(ll, l)
+	}
+
+	return ll
+}
+
+func (c *CmdBuff) fireBufferCompleted(t, s string) {
+	for _, l := range c.snapshotListeners() {
 		l.BufferCompleted(t, s)
 	}
 }
 
 func (c *CmdBuff) fireBufferChanged(t, s string) {
-	for l := range c.listeners {
+	for _, l := range c.snapshotListeners() {
 		l.BufferChanged(t, s)
 	}
 }
 
 func (c *CmdBuff) fireActive(b bool) {
-	for l := range c.listeners {
-		l.BufferActive(b, c.GetKind())
+	kind := c.GetKind()
+	for _, l := range c.snapshotListeners() {
+		l.BufferActive(b, kind)
 	}
 }

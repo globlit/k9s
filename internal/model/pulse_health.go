@@ -8,7 +8,6 @@ import (
 	"github.com/derailed/k9s/internal"
 	"github.com/derailed/k9s/internal/client"
 	"github.com/derailed/k9s/internal/dao"
-	"github.com/derailed/k9s/internal/render"
 	"github.com/derailed/k9s/internal/slogs"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -78,6 +77,7 @@ func (h *PulseHealth) Watch(ctx context.Context, ns string) HealthChan {
 	ctx = context.WithValue(ctx, internal.KeyWithMetrics, false)
 
 	go func(ctx context.Context, ns string, c HealthChan) {
+		defer internal.LogPanic("pulse health")
 		if err := h.checkPulse(ctx, ns, c); err != nil {
 			slog.Error("Pulse check failed", slogs.Error, err)
 		}
@@ -104,22 +104,18 @@ func (h *PulseHealth) checkPulse(ctx context.Context, ns string, c HealthChan) e
 		if err != nil {
 			return err
 		}
-		c <- check
+		// The consumer may have gone away: never block past cancellation.
+		select {
+		case c <- check:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 	return nil
 }
 
 func (h *PulseHealth) check(ctx context.Context, ns string, gvr *client.GVR) (HealthPoint, error) {
-	meta, ok := Registry[gvr]
-	if !ok {
-		meta = ResourceMeta{
-			DAO:      new(dao.Table),
-			Renderer: new(render.Table),
-		}
-	}
-	if meta.DAO == nil {
-		meta.DAO = &dao.Resource{}
-	}
+	meta := resourceMeta(gvr)
 
 	meta.DAO.Init(h.factory, gvr)
 	oo, err := meta.DAO.List(ctx, ns)

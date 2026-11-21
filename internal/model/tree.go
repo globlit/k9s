@@ -7,15 +7,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"regexp"
-	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/derailed/k9s/internal"
 	"github.com/derailed/k9s/internal/client"
 	"github.com/derailed/k9s/internal/dao"
-	"github.com/derailed/k9s/internal/render"
 	"github.com/derailed/k9s/internal/slogs"
 	"github.com/derailed/k9s/internal/xray"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -163,6 +160,7 @@ func (t *Tree) ToYAML(ctx context.Context, gvr *client.GVR, path string) (string
 }
 
 func (t *Tree) updater(ctx context.Context) {
+	defer internal.LogPanic("tree updater")
 	defer slog.Debug("Tree-model canceled", slogs.GVR, t.gvr)
 
 	rate := initTreeRefreshRate
@@ -225,9 +223,9 @@ func (t *Tree) reconcile(ctx context.Context) error {
 	}
 
 	root.Sort()
-	if t.query != "" {
-		t.root = root.Filter(t.query, rxMatch)
-	}
+	// Keep the unfiltered tree: views apply the filter themselves (and re-run
+	// it on Peek). Diffing a filtered tree against an unfiltered one would
+	// report a change, and redraw, on every tick.
 	if t.root == nil || t.root.Diff(root) {
 		t.root = root
 		t.fireTreeChanged(t.root)
@@ -237,18 +235,7 @@ func (t *Tree) reconcile(ctx context.Context) error {
 }
 
 func (t *Tree) resourceMeta() ResourceMeta {
-	meta, ok := Registry[t.gvr]
-	if !ok {
-		meta = ResourceMeta{
-			DAO:      &dao.Table{},
-			Renderer: &render.Table{},
-		}
-	}
-	if meta.DAO == nil {
-		meta.DAO = &dao.Resource{}
-	}
-
-	return meta
+	return resourceMeta(t.gvr)
 }
 
 func (t *Tree) fireTreeChanged(root *xray.TreeNode) {
@@ -277,34 +264,60 @@ func (t *Tree) getMeta(ctx context.Context, gvr *client.GVR) (ResourceMeta, erro
 // ----------------------------------------------------------------------------
 // Helpers...
 
-func rxMatch(q, path string) bool {
-	rx := regexp.MustCompile(`(?i)` + q)
-
-	tokens := strings.Split(path, "::")
-	for _, t := range tokens {
-		if rx.MatchString(t) {
-			return true
-		}
-	}
-	return false
-}
-
 func treeHydrate(ctx context.Context, ns string, oo []runtime.Object, re TreeRenderer) error {
 	if re == nil {
 		return fmt.Errorf("no tree renderer defined for this resource")
 	}
+	root, ok := ctx.Value(xray.KeyParent).(*xray.TreeNode)
+	if !ok {
+		return fmt.Errorf("expecting a TreeNode but got %T", ctx.Value(xray.KeyParent))
+	}
+
+	// Renderers find-or-create namespace nodes on their parent and append to
+	// it. Doing that concurrently on one shared root loses or duplicates
+	// nodes, so each object renders into its own scratch root and the
+	// results are merged sequentially afterwards.
+	scratch := make([]*xray.TreeNode, len(oo))
 	pool := internal.NewWorkerPool(ctx, internal.DefaultPoolSize)
-	for _, o := range oo {
+	for i, o := range oo {
 		pool.Add(func(_ context.Context) error {
-			return re.Render(ctx, ns, o)
+			sr := xray.NewTreeNode(root.GVR, root.ID)
+			scratch[i] = sr
+			return re.Render(context.WithValue(ctx, xray.KeyParent, sr), ns, o)
 		})
 	}
 	errs := pool.Drain()
+	for _, sr := range scratch {
+		mergeTree(root, sr)
+	}
 	if len(errs) > 0 {
 		return errs[0]
 	}
 
 	return nil
+}
+
+// mergeTree moves src's children under dst, folding nodes that share the
+// same identity (e.g. a namespace node created by several objects).
+func mergeTree(dst, src *xray.TreeNode) {
+	if src == nil {
+		return
+	}
+	idx := make(map[string]*xray.TreeNode, len(dst.Children))
+	for _, c := range dst.Children {
+		idx[c.GVR.String()+"|"+c.ID] = c
+	}
+	for _, c := range src.Children {
+		k := c.GVR.String() + "|" + c.ID
+		if cur, ok := idx[k]; ok && c.GVR == client.NsGVR {
+			for _, gc := range c.Children {
+				cur.Add(gc)
+			}
+			continue
+		}
+		dst.Add(c)
+		idx[k] = c
+	}
 }
 
 func genericTreeHydrate(ctx context.Context, ns string, table *metav1.Table, re TreeRenderer) error {

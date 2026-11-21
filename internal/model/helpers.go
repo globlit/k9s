@@ -6,6 +6,7 @@ package model
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"regexp"
 	"time"
 
@@ -40,8 +41,39 @@ func resourceMeta(gvr *client.GVR) ResourceMeta {
 	if meta.DAO == nil {
 		meta.DAO = new(dao.Resource)
 	}
+	// Registry entries are shared singletons, but callers mutate them (Init,
+	// SetIncludeObject, SetViewSetting) from concurrent refresh goroutines.
+	// Hand out private instances instead.
+	meta.DAO = freshInstance(meta.DAO)
+	meta.Renderer = freshInstance(meta.Renderer)
+	meta.TreeRenderer = freshInstance(meta.TreeRenderer)
 
 	return meta
+}
+
+// freshInstance returns a new zero instance of v's concrete type. Registry
+// entries are zero values except for embedded struct pointers (e.g.
+// render.NewPod), so those are allocated to match.
+func freshInstance[T any](v T) T {
+	rv := reflect.ValueOf(v)
+	if !rv.IsValid() || rv.Kind() != reflect.Pointer || rv.IsNil() || rv.Elem().Kind() != reflect.Struct {
+		return v
+	}
+	n := reflect.New(rv.Elem().Type())
+	src, dst := rv.Elem(), n.Elem()
+	for i := range dst.NumField() {
+		f := dst.Type().Field(i)
+		if !f.Anonymous || f.Type.Kind() != reflect.Pointer || src.Field(i).IsNil() || !dst.Field(i).CanSet() {
+			continue
+		}
+		dst.Field(i).Set(reflect.New(f.Type.Elem()))
+	}
+	nv, ok := n.Interface().(T)
+	if !ok {
+		return v
+	}
+
+	return nv
 }
 
 // MetaFQN returns a fully qualified resource name.

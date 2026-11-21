@@ -43,7 +43,19 @@ func TestSeriesTruncate(t *testing.T) {
 	}{
 		"one": {
 			n: 1,
-			e: 4,
+			e: 1,
+		},
+		"some": {
+			n: 3,
+			e: 3,
+		},
+		"none": {
+			n: 0,
+			e: 0,
+		},
+		"more-than-len": {
+			n: 10,
+			e: 5,
 		},
 	}
 

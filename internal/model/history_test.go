@@ -16,7 +16,7 @@ func TestHistoryClear(t *testing.T) {
 	for i := 1; i < 5; i++ {
 		h.Push(fmt.Sprintf("cmd%d", i))
 	}
-	assert.Equal(t, []string{"cmd1", "cmd2", "cmd3"}, h.List())
+	assert.Equal(t, []string{"cmd2", "cmd3", "cmd4"}, h.List())
 
 	h.Clear()
 	assert.True(t, h.Empty())
@@ -30,7 +30,11 @@ func TestHistoryPush(t *testing.T) {
 	h.Push("cmd1")
 	h.Push("")
 
-	assert.Equal(t, []string{"cmd1", "cmd2", "cmd3"}, h.List())
+	// Full: the oldest entry is evicted to make room.
+	assert.Equal(t, []string{"cmd2", "cmd3", "cmd1"}, h.List())
+	c, ok := h.Top()
+	assert.True(t, ok)
+	assert.Equal(t, "cmd1", c)
 }
 
 func TestHistoryPushKeepsCase(t *testing.T) {

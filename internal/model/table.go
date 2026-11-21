@@ -97,24 +97,24 @@ func (t *Table) AddListener(l TableListener) {
 	t.mx.Lock()
 	defer t.mx.Unlock()
 
-	t.listeners = append(t.listeners, l)
+	// Copy on write: fire* iterate a snapshot of the slice outside the lock.
+	ll := make([]TableListener, 0, len(t.listeners)+1)
+	ll = append(ll, t.listeners...)
+	t.listeners = append(ll, l)
 }
 
 // RemoveListener delete a listener from the list.
 func (t *Table) RemoveListener(l TableListener) {
-	victim := -1
-	for i, lis := range t.listeners {
-		if lis == l {
-			victim = i
-			break
+	t.mx.Lock()
+	defer t.mx.Unlock()
+
+	ll := make([]TableListener, 0, len(t.listeners))
+	for _, lis := range t.listeners {
+		if lis != l {
+			ll = append(ll, lis)
 		}
 	}
-
-	if victim >= 0 {
-		t.mx.Lock()
-		t.listeners = append(t.listeners[:victim], t.listeners[victim+1:]...)
-		t.mx.Unlock()
-	}
+	t.listeners = ll
 }
 
 // Watch initiates model updates.
@@ -201,6 +201,7 @@ func (t *Table) Peek() *model1.TableData {
 }
 
 func (t *Table) updater(ctx context.Context) {
+	defer internal.LogPanic("table updater")
 	bf := backoff.NewExponentialBackOff()
 	bf.InitialInterval, bf.MaxElapsedTime = initRefreshRate, maxReaderRetryInterval
 	rate := initRefreshRate
@@ -271,7 +272,12 @@ func (t *Table) reconcile(ctx context.Context) error {
 		err error
 	)
 	meta := resourceMeta(t.gvr)
-	if t.vs != nil {
+	t.mx.RLock()
+	vs := t.vs
+	t.mx.RUnlock()
+	// Full objects are only needed to evaluate custom columns: asking the API
+	// server for them otherwise multiplies the payload for nothing.
+	if vs != nil && vs.HasCols() {
 		meta.DAO.SetIncludeObject(true)
 	}
 	ctx = context.WithValue(ctx, internal.KeyLabels, t.labelSelector)
@@ -285,7 +291,7 @@ func (t *Table) reconcile(ctx context.Context) error {
 		return err
 	}
 	r := meta.Renderer
-	r.SetViewSetting(t.vs)
+	r.SetViewSetting(vs)
 
 	return t.data.Render(ctx, meta.Renderer, oo)
 }
