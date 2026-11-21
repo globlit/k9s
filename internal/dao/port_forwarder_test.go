@@ -17,7 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/version"
-	"k8s.io/client-go/discovery/cached/disk"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -160,16 +160,16 @@ type pfConn struct {
 	dialErr error
 }
 
-func (*pfConn) Config() *client.Config                                { return nil }
-func (c *pfConn) Dial() (kubernetes.Interface, error)                 { return nil, c.dialErr }
-func (*pfConn) DialLogs() (kubernetes.Interface, error)               { return nil, nil }
-func (*pfConn) ConnectionOK() bool                                    { return true }
-func (*pfConn) SwitchContext(string) error                            { return nil }
-func (*pfConn) CachedDiscovery() (*disk.CachedDiscoveryClient, error) { return nil, nil }
+func (*pfConn) Config() *client.Config                                       { return nil }
+func (c *pfConn) Dial() (kubernetes.Interface, error)                        { return nil, c.dialErr }
+func (*pfConn) DialLogs() (kubernetes.Interface, error)                      { return nil, nil }
+func (*pfConn) ConnectionOK() bool                                           { return true }
+func (*pfConn) SwitchContext(string) error                                   { return nil }
+func (*pfConn) CachedDiscovery() (discovery.CachedDiscoveryInterface, error) { return nil, nil }
 func (*pfConn) RestConfig() (*restclient.Config, error) {
 	return nil, fmt.Errorf("mock: no real cluster")
 }
-func (*pfConn) MXDial() (*versioned.Clientset, error)                    { return nil, nil }
+func (*pfConn) MXDial() (versioned.Interface, error)                     { return nil, nil }
 func (*pfConn) DynDial() (dynamic.Interface, error)                      { return nil, nil }
 func (*pfConn) HasMetrics() bool                                         { return false }
 func (*pfConn) CheckConnectivity() bool                                  { return false }

@@ -20,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -516,7 +517,7 @@ func (a *APIClient) RestConfig() (*restclient.Config, error) {
 }
 
 // CachedDiscovery returns a cached discovery client.
-func (a *APIClient) CachedDiscovery() (*disk.CachedDiscoveryClient, error) {
+func (a *APIClient) CachedDiscovery() (discovery.CachedDiscoveryInterface, error) {
 	if !a.getConnOK() {
 		return nil, errors.New("no connection to cached dial")
 	}
@@ -567,7 +568,7 @@ func (a *APIClient) DynDial() (dynamic.Interface, error) {
 }
 
 // MXDial returns a handle to the metrics server.
-func (a *APIClient) MXDial() (*versioned.Clientset, error) {
+func (a *APIClient) MXDial() (versioned.Interface, error) {
 	if c := a.getMxsClient(); c != nil {
 		return c, nil
 	}
@@ -583,7 +584,7 @@ func (a *APIClient) MXDial() (*versioned.Clientset, error) {
 	}
 	a.setMxsClient(c)
 
-	return a.getMxsClient(), err
+	return a.getMxsClient(), nil
 }
 
 func (a *APIClient) invalidateCache() error {

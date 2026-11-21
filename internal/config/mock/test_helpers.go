@@ -18,7 +18,7 @@ import (
 	"github.com/globlit/k9s/internal/config"
 	version "k8s.io/apimachinery/pkg/version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	disk "k8s.io/client-go/discovery/cached/disk"
+	"k8s.io/client-go/discovery"
 	dynamic "k8s.io/client-go/dynamic"
 	kubernetes "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -142,13 +142,13 @@ func (mockConnection) DialLogs() (kubernetes.Interface, error) {
 func (mockConnection) SwitchContext(string) error {
 	return nil
 }
-func (mockConnection) CachedDiscovery() (*disk.CachedDiscoveryClient, error) {
+func (mockConnection) CachedDiscovery() (discovery.CachedDiscoveryInterface, error) {
 	return nil, nil
 }
 func (mockConnection) RestConfig() (*restclient.Config, error) {
 	return nil, nil
 }
-func (mockConnection) MXDial() (*versioned.Clientset, error) {
+func (mockConnection) MXDial() (versioned.Interface, error) {
 	return nil, nil
 }
 func (mockConnection) DynDial() (dynamic.Interface, error) {

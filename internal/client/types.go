@@ -5,7 +5,7 @@ package client
 
 import (
 	"k8s.io/apimachinery/pkg/version"
-	"k8s.io/client-go/discovery/cached/disk"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -106,13 +106,13 @@ type Connection interface {
 	SwitchContext(ctx string) error
 
 	// CachedDiscovery connects to discovery client.
-	CachedDiscovery() (*disk.CachedDiscoveryClient, error)
+	CachedDiscovery() (discovery.CachedDiscoveryInterface, error)
 
 	// RestConfig connects to rest client.
 	RestConfig() (*restclient.Config, error)
 
 	// MXDial connects to metrics server.
-	MXDial() (*versioned.Clientset, error)
+	MXDial() (versioned.Interface, error)
 
 	// DynDial connects to dynamic client.
 	DynDial() (dynamic.Interface, error)

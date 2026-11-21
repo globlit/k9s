@@ -18,7 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/version"
-	"k8s.io/client-go/discovery/cached/disk"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -46,29 +46,29 @@ func makeConn() *conn {
 	return &conn{}
 }
 
-func (*conn) Config() *client.Config                                   { return nil }
-func (*conn) Dial() (kubernetes.Interface, error)                      { return nil, nil }
-func (*conn) DialLogs() (kubernetes.Interface, error)                  { return nil, nil }
-func (*conn) ConnectionOK() bool                                       { return true }
-func (*conn) SwitchContext(string) error                               { return nil }
-func (*conn) CachedDiscovery() (*disk.CachedDiscoveryClient, error)    { return nil, nil }
-func (*conn) RestConfig() (*restclient.Config, error)                  { return nil, nil }
-func (*conn) MXDial() (*versioned.Clientset, error)                    { return nil, nil }
-func (*conn) DynDial() (dynamic.Interface, error)                      { return nil, nil }
-func (*conn) HasMetrics() bool                                         { return false }
-func (*conn) CheckConnectivity() bool                                  { return false }
-func (*conn) IsNamespaced(string) bool                                 { return false }
-func (*conn) SupportsResource(string) bool                             { return false }
-func (*conn) ValidNamespaces() ([]v1.Namespace, error)                 { return nil, nil }
-func (*conn) SupportsRes(string, []string) (a string, b bool, e error) { return "", false, nil }
-func (*conn) ServerVersion() (*version.Info, error)                    { return nil, nil }
-func (*conn) CurrentNamespaceName() (string, error)                    { return "", nil }
-func (*conn) CanI(string, *client.GVR, string, []string) (bool, error) { return true, nil }
-func (*conn) ActiveContext() string                                    { return "" }
-func (*conn) ActiveNamespace() string                                  { return "" }
-func (*conn) IsValidNamespace(string) bool                             { return true }
-func (*conn) ValidNamespaceNames() (client.NamespaceNames, error)      { return nil, nil }
-func (*conn) IsActiveNamespace(string) bool                            { return false }
+func (*conn) Config() *client.Config                                       { return nil }
+func (*conn) Dial() (kubernetes.Interface, error)                          { return nil, nil }
+func (*conn) DialLogs() (kubernetes.Interface, error)                      { return nil, nil }
+func (*conn) ConnectionOK() bool                                           { return true }
+func (*conn) SwitchContext(string) error                                   { return nil }
+func (*conn) CachedDiscovery() (discovery.CachedDiscoveryInterface, error) { return nil, nil }
+func (*conn) RestConfig() (*restclient.Config, error)                      { return nil, nil }
+func (*conn) MXDial() (versioned.Interface, error)                         { return nil, nil }
+func (*conn) DynDial() (dynamic.Interface, error)                          { return nil, nil }
+func (*conn) HasMetrics() bool                                             { return false }
+func (*conn) CheckConnectivity() bool                                      { return false }
+func (*conn) IsNamespaced(string) bool                                     { return false }
+func (*conn) SupportsResource(string) bool                                 { return false }
+func (*conn) ValidNamespaces() ([]v1.Namespace, error)                     { return nil, nil }
+func (*conn) SupportsRes(string, []string) (a string, b bool, e error)     { return "", false, nil }
+func (*conn) ServerVersion() (*version.Info, error)                        { return nil, nil }
+func (*conn) CurrentNamespaceName() (string, error)                        { return "", nil }
+func (*conn) CanI(string, *client.GVR, string, []string) (bool, error)     { return true, nil }
+func (*conn) ActiveContext() string                                        { return "" }
+func (*conn) ActiveNamespace() string                                      { return "" }
+func (*conn) IsValidNamespace(string) bool                                 { return true }
+func (*conn) ValidNamespaceNames() (client.NamespaceNames, error)          { return nil, nil }
+func (*conn) IsActiveNamespace(string) bool                                { return false }
 
 type podFactory struct{}
 
