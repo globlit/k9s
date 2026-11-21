@@ -160,7 +160,7 @@ func New(t *testing.T) *H {
 		t:       t,
 		NS:      strings.Trim("e2e-"+name, "-") + "-" + id,
 		home:    t.TempDir(),
-		socket:  "k9s-e2e-" + id,
+		socket:  filepath.Join(os.TempDir(), "k9s-e2e-"+id+".sock"),
 		session: "k9s-e2e-" + id,
 	}
 	h.Kubectl("create", "namespace", h.NS)
@@ -174,7 +174,8 @@ func (h *H) cleanup() {
 		h.saveArtifacts()
 	}
 	if h.started {
-		_ = exec.Command("tmux", "-L", h.socket, "kill-server").Run()
+		_ = exec.Command("tmux", "-S", h.socket, "kill-server").Run()
+		_ = os.Remove(h.socket)
 	}
 	_, _ = kubectl(context.Background(), "delete", "namespace", h.NS, "--wait=false", "--ignore-not-found")
 }
@@ -195,7 +196,7 @@ func (h *H) saveArtifacts() {
 	}
 }
 
-// Start runs k9s in a new detached tmux session on a private tmux socket.
+// Start runs k9s in a new detached tmux session on a private socket.
 func (h *H) Start(args ...string) {
 	h.t.Helper()
 	h.writeConfig()
@@ -232,7 +233,7 @@ func (h *H) Start(args ...string) {
 	// Keep the pane open after k9s exits so the exit code stays visible.
 	cmd.WriteString(`; echo "k9s exited: $?"; sleep 3600`)
 
-	tmux := exec.Command("tmux", "-L", h.socket, "-f", "/dev/null",
+	tmux := exec.Command("tmux", "-S", h.socket, "-f", "/dev/null",
 		"new-session", "-d", "-x", fmt.Sprint(cols), "-y", fmt.Sprint(rows), "-s", h.session,
 		"sh", "-c", "env "+cmd.String())
 	tmux.Env = append(os.Environ(), "TERM=xterm-256color")
@@ -301,7 +302,7 @@ func (h *H) Filter(q string) {
 // Capture returns the visible pane text.
 func (h *H) Capture() string {
 	h.t.Helper()
-	out, err := exec.Command("tmux", "-L", h.socket, "capture-pane", "-p", "-t", h.session).Output()
+	out, err := exec.Command("tmux", "-S", h.socket, "capture-pane", "-p", "-t", h.session).Output()
 	if err != nil {
 		h.t.Logf("capture-pane: %v", err)
 		return h.last
@@ -383,7 +384,7 @@ func (h *H) Helm(args ...string) string {
 	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		h.t.Fatalf("helm %s: %v\n%s", strings.Join(args[5:], " "), err, out)
+		h.t.Fatalf("helm %s: %v\n%s", strings.Join(args[6:], " "), err, out)
 	}
 
 	return string(out)
@@ -391,7 +392,7 @@ func (h *H) Helm(args ...string) string {
 
 func (h *H) tmux(args ...string) {
 	h.t.Helper()
-	if out, err := exec.Command("tmux", append([]string{"-L", h.socket}, args...)...).CombinedOutput(); err != nil {
+	if out, err := exec.Command("tmux", append([]string{"-S", h.socket}, args...)...).CombinedOutput(); err != nil {
 		h.t.Fatalf("tmux %v: %v\n%s", args, err, out)
 	}
 }
