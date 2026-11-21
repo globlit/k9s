@@ -45,16 +45,19 @@ const (
 // Pod represents a pod viewer.
 type Pod struct {
 	ResourceViewer
+
+	browser *Browser
 }
 
 // NewPod returns a new viewer.
 func NewPod(gvr *client.GVR) ResourceViewer {
 	var p Pod
+	p.browser = &Browser{Table: NewTable(gvr)}
 	p.ResourceViewer = NewPortForwardExtender(
 		NewOwnerExtender(
 			NewVulnerabilityExtender(
 				NewImageExtender(
-					NewLogsExtender(NewBrowser(gvr), p.logOptions),
+					NewLogsExtender(p.browser, p.logOptions),
 				),
 			),
 		),
@@ -201,21 +204,19 @@ func (p *Pod) killCmd(evt *tcell.EventKey) *tcell.EventKey {
 		p.App().Flash().Err(fmt.Errorf("expecting a nuker for %q", p.GVR()))
 		return nil
 	}
-	if len(selections) > 1 {
-		p.App().Flash().Infof("Delete %d marked %s", len(selections), p.GVR())
-	} else {
-		p.App().Flash().Infof("Delete resource %s %s", p.GVR(), selections[0])
-	}
-	p.GetTable().ShowDeleted()
-	for _, path := range selections {
-		if err := nuker.Delete(context.Background(), path, nil, dao.NowGrace); err != nil {
-			p.App().Flash().Errf("Delete failed with %s", err)
+	msg := fmt.Sprintf("Kill %d pod(s)?", len(selections))
+	d := p.App().Styles.Dialog()
+	dialog.ShowConfirm(&d, p.App().Content.Pages, "Kill", msg, func() {
+		if len(selections) > 1 {
+			p.App().Flash().Infof("Delete %d marked %s", len(selections), p.GVR())
 		} else {
-			p.App().factory.DeleteForwarder(path)
+			p.App().Flash().Infof("Delete resource %s %s", p.GVR(), selections[0])
 		}
-		p.GetTable().DeleteMark(path)
-	}
-	p.Refresh()
+		p.GetTable().ShowDeleted()
+		p.browser.deleteAsync(selections, func(ctx context.Context, sel string) error {
+			return nuker.Delete(ctx, sel, nil, dao.NowGrace)
+		})
+	}, func() {})
 
 	return nil
 }
