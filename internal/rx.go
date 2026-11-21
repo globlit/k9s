@@ -28,7 +28,7 @@ func CompileFilterRx(q string) (rx *regexp.Regexp, ok bool) {
 	rx, err := regexp.Compile(`(?i)` + q)
 	ok = err == nil
 	if !ok {
-		rx = regexp.MustCompile(`(?i)` + regexp.QuoteMeta(strings.ToValidUTF8(q, "\uFFFD")))
+		rx = regexp.MustCompile(`(?i)` + regexp.QuoteMeta(validUTF8(q)))
 	}
 	if len(rxCache.m) >= rxCacheSize {
 		clear(rxCache.m)
@@ -36,4 +36,10 @@ func CompileFilterRx(q string) (rx *regexp.Regexp, ok bool) {
 	rxCache.m[q] = rx
 
 	return rx, ok
+}
+
+// validUTF8 sets U+FFFD for each invalid byte. The regexp engine reads an
+// invalid byte as U+FFFD, thus the literal continues to match q.
+func validUTF8(q string) string {
+	return strings.Map(func(r rune) rune { return r }, q)
 }
