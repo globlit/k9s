@@ -129,27 +129,36 @@ func (w *Workload) resourceDelete(selections []string, msg string) {
 		} else {
 			w.App().Flash().Infof("Delete resource %s %s", w.GVR(), selections[0])
 		}
-		for _, sel := range selections {
-			gvr, fqn, ok := parsePath(sel)
-			if !ok {
-				w.App().Flash().Err(fmt.Errorf("unable to parse path: %q", sel))
-				return
-			}
-
-			grace := dao.DefaultGrace
-			if force {
-				grace = dao.ForceGrace
-			}
-			if err := w.GetTable().GetModel().Delete(w.defaultContext(gvr, fqn), fqn, propagation, grace); err != nil {
-				w.App().Flash().Errf("Delete failed with `%s", err)
-				continue
-			}
-			if gvr == client.PodGVR {
-				w.App().factory.DeleteForwarder(fqn)
-			}
-			w.GetTable().DeleteMark(sel)
+		grace := dao.DefaultGrace
+		if force {
+			grace = dao.ForceGrace
 		}
-		w.GetTable().Start()
+		m := w.GetTable().GetModel()
+		runAsync(w.defaultContext(nil, ""), w.App(), selections, "delete",
+			func(ctx context.Context, sel string) error {
+				gvr, fqn, ok := parsePath(sel)
+				if !ok {
+					return fmt.Errorf("unable to parse path: %q", sel)
+				}
+				ctx = context.WithValue(ctx, internal.KeyGVR, gvr)
+				ctx = context.WithValue(ctx, internal.KeyPath, fqn)
+				if err := m.Delete(ctx, fqn, propagation, grace); err != nil {
+					return err
+				}
+				if gvr == client.PodGVR {
+					w.App().factory.DeleteForwarder(fqn)
+				}
+				return nil
+			},
+			func(done []string, errs []error) {
+				for _, sel := range done {
+					w.GetTable().DeleteMark(sel)
+				}
+				if len(errs) == 1 && len(selections) == 1 {
+					w.App().Flash().Errf("Delete failed with `%s", errs[0])
+				}
+				w.GetTable().Start()
+			})
 	}
 	d := w.App().Styles.Dialog()
 	dialog.ShowDelete(&d, w.App().Content.Pages, msg, okFn, func() {})
