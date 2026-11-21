@@ -5,6 +5,7 @@ package internal
 
 import (
 	"regexp"
+	"strings"
 	"sync"
 )
 
@@ -27,7 +28,7 @@ func CompileFilterRx(q string) (rx *regexp.Regexp, ok bool) {
 	rx, err := regexp.Compile(`(?i)` + q)
 	ok = err == nil
 	if !ok {
-		rx = regexp.MustCompile(`(?i)` + regexp.QuoteMeta(q))
+		rx = regexp.MustCompile(`(?i)` + regexp.QuoteMeta(strings.ToValidUTF8(q, "\uFFFD")))
 	}
 	if len(rxCache.m) >= rxCacheSize {
 		clear(rxCache.m)
