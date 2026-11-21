@@ -12,6 +12,13 @@ IMAGE           := ${IMG_NAME}:${VERSION}
 IMAGE_LATEST    := ${IMG_NAME}:latest
 BUILD_PLATFORMS ?= linux/amd64,linux/arm64
 
+TEST_P          ?= 2
+GOMAXPROCS      ?= 4
+FUZZTIME        ?= 30s
+BENCH_OUT       ?= bench.txt
+BENCH_BASE      ?= bench-base.txt
+TEST_ENV        := GOMAXPROCS=$(GOMAXPROCS)
+
 SOURCE_DATE_EPOCH ?= $(shell date +%s)
 ifeq ($(shell uname), Darwin)
 DATE            ?= $(shell TZ=UTC /bin/date -j -f "%s" ${SOURCE_DATE_EPOCH} +"%Y-%m-%dT%H:%M:%SZ")
@@ -22,10 +29,23 @@ endif
 default: help
 
 test:                    ## Run all tests
-	@go clean --testcache && go test ./...
+	@$(TEST_ENV) go test -count=1 -p $(TEST_P) -timeout 10m ./...
 
 test-race:               ## Run all tests with the race detector
-	@CGO_ENABLED=1 go test -race -count=1 ./...
+	@CGO_ENABLED=1 $(TEST_ENV) go test -race -count=1 -p 1 -parallel 2 -timeout 20m ./...
+
+fuzz-seed:               ## Run fuzz targets on their seed corpus only
+	@$(TEST_ENV) go test -count=1 -p $(TEST_P) -run '^Fuzz' ./...
+
+fuzz:                    ## Fuzz each target in turn for FUZZTIME (default 30s)
+	@FUZZTIME=$(FUZZTIME) $(TEST_ENV) hack/fuzz.sh
+
+bench:                   ## Run benchmarks into BENCH_OUT
+	@$(TEST_ENV) go test -run '^$$' -bench . -benchmem -count 6 -p 1 ./... | tee $(BENCH_OUT)
+
+bench-compare:           ## Compare BENCH_BASE with BENCH_OUT using benchstat
+	@command -v benchstat >/dev/null 2>&1 || go install golang.org/x/perf/cmd/benchstat@latest
+	@benchstat $(BENCH_BASE) $(BENCH_OUT)
 
 lint:                    ## Run golangci-lint
 	@command -v golangci-lint >/dev/null 2>&1 || go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
