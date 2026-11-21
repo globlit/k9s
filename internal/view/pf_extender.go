@@ -139,10 +139,9 @@ func runForward(v ResourceViewer, pf watch.Forwarder, f *portforward.PortForward
 	if err := f.ForwardPorts(); err != nil {
 		v.App().Flash().Warnf("PortForward failed for %s: %s. Deleting!", pf.ID(), err)
 	}
-	v.App().QueueUpdateDraw(func() {
-		v.App().factory.DeleteForwarder(pf.ID())
-		pf.SetActive(false)
-	})
+	v.App().factory.RemoveForwarder(pf)
+	pf.SetActive(false)
+	v.App().QueueUpdateDraw(func() {})
 }
 
 func startFwdCB(v ResourceViewer, path string, pts port.PortTunnels) error {

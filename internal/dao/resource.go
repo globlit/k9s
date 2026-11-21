@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/derailed/k9s/internal"
+	"github.com/derailed/k9s/internal/client"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -80,7 +81,7 @@ func (r *Resource) Get(_ context.Context, path string) (runtime.Object, error) {
 
 // ToYAML returns a resource yaml.
 func (r *Resource) ToYAML(path string, showManaged bool) (string, error) {
-	o, err := r.Get(context.Background(), path)
+	o, err := r.getForYAML(path, showManaged)
 	if err != nil {
 		return "", err
 	}
@@ -90,4 +91,14 @@ func (r *Resource) ToYAML(path string, showManaged bool) (string, error) {
 		return "", fmt.Errorf("unable to marshal resource %w", err)
 	}
 	return raw, nil
+}
+
+// getForYAML returns the cached object, or the live one when the cache
+// stripped what is asked for: managed fields, and CRD schemas.
+func (r *Resource) getForYAML(path string, showManaged bool) (runtime.Object, error) {
+	if showManaged || r.gvr == client.CrdGVR {
+		return r.Generic.Get(context.Background(), path)
+	}
+
+	return r.Get(context.Background(), path)
 }

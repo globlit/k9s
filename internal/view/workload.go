@@ -142,8 +142,10 @@ func (w *Workload) resourceDelete(selections []string, msg string) {
 			}
 			if err := w.GetTable().GetModel().Delete(w.defaultContext(gvr, fqn), fqn, propagation, grace); err != nil {
 				w.App().Flash().Errf("Delete failed with `%s", err)
-			} else {
-				w.App().factory.DeleteForwarder(sel)
+				continue
+			}
+			if gvr == client.PodGVR {
+				w.App().factory.DeleteForwarder(fqn)
 			}
 			w.GetTable().DeleteMark(sel)
 		}

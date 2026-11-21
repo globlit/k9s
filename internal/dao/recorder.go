@@ -41,8 +41,50 @@ type Point struct {
 type Recorder struct {
 	conn   client.Connection
 	series *cache.LRUExpireCache
-	mxChan MetricsChan
+	sink   *mxSink
 	mx     sync.RWMutex
+}
+
+// mxSink delivers metrics to a single watcher. Each Watch gets its own sink
+// so a stale watch can never close or block a newer watcher's channel.
+type mxSink struct {
+	ch     MetricsChan
+	mx     sync.Mutex
+	closed bool
+}
+
+func newMxSink() *mxSink {
+	return &mxSink{ch: make(MetricsChan, 2)}
+}
+
+// send delivers ts without blocking: if the consumer is slow or gone the
+// point is dropped rather than stalling the producer (and the UI).
+func (s *mxSink) send(ts TimeSeries) {
+	if s == nil {
+		return
+	}
+	s.mx.Lock()
+	defer s.mx.Unlock()
+	if s.closed {
+		return
+	}
+	select {
+	case s.ch <- ts:
+	default:
+		slog.Debug("Dropping metrics point: consumer is not keeping up")
+	}
+}
+
+func (s *mxSink) close() {
+	if s == nil {
+		return
+	}
+	s.mx.Lock()
+	defer s.mx.Unlock()
+	if !s.closed {
+		s.closed = true
+		close(s.ch)
+	}
 }
 
 func DialRecorder(c client.Connection) *Recorder {
@@ -72,8 +114,8 @@ func (r *Recorder) Clear() {
 	}
 }
 
-func (r *Recorder) dispatchSeries(kind, ns string) {
-	if r.mxChan == nil {
+func (r *Recorder) dispatchSeries(sink *mxSink, kind, ns string) {
+	if sink == nil {
 		return
 	}
 	kk := r.series.Keys()
@@ -97,55 +139,55 @@ func (r *Recorder) dispatchSeries(kind, ns string) {
 		}
 	}
 	if len(ts) > 0 {
-		r.mxChan <- ts
+		sink.send(ts)
 	}
 }
 
 func (r *Recorder) Watch(ctx context.Context, ns string) MetricsChan {
+	sink := newMxSink()
 	r.mx.Lock()
-	if r.mxChan != nil {
-		close(r.mxChan)
-		r.mxChan = nil
-	}
-	r.mxChan = make(MetricsChan, 2)
+	prev := r.sink
+	r.sink = sink
 	r.mx.Unlock()
+	prev.close()
 
 	go func() {
+		defer internal.LogPanic("metrics recorder")
 		kind := podMetrics
 		if client.IsAllNamespaces(ns) {
 			kind = nodeMetrics
 		}
 		switch kind {
 		case podMetrics:
-			if err := r.recordPodMetrics(ctx, ns); err != nil {
+			if err := r.recordPodMetrics(ctx, sink, ns); err != nil {
 				slog.Error("Record pod metrics failed", slogs.Error, err)
 			}
 		case nodeMetrics:
-			if err := r.recordNodeMetrics(ctx); err != nil {
+			if err := r.recordNodeMetrics(ctx, sink); err != nil {
 				slog.Error("Record node metrics failed", slogs.Error, err)
 			}
 		}
-		r.dispatchSeries(kind, ns)
+		r.dispatchSeries(sink, kind, ns)
 		<-ctx.Done()
+		sink.close()
 		r.mx.Lock()
-		if r.mxChan != nil {
-			close(r.mxChan)
-			r.mxChan = nil
+		if r.sink == sink {
+			r.sink = nil
 		}
 		r.mx.Unlock()
 	}()
 
-	return r.mxChan
+	return sink.ch
 }
 
 func (r *Recorder) Record(ctx context.Context) error {
-	if err := r.recordNodeMetrics(ctx); err != nil {
+	if err := r.recordNodeMetrics(ctx, nil); err != nil {
 		return err
 	}
-	return r.recordPodMetrics(ctx, client.NamespaceAll)
+	return r.recordPodMetrics(ctx, nil, client.NamespaceAll)
 }
 
-func (r *Recorder) recordNodeMetrics(ctx context.Context) error {
+func (r *Recorder) recordNodeMetrics(ctx context.Context, sink *mxSink) error {
 	f, ok := ctx.Value(internal.KeyFactory).(Factory)
 	if !ok {
 		return errors.New("expecting factory in context")
@@ -156,13 +198,16 @@ func (r *Recorder) recordNodeMetrics(ctx context.Context) error {
 	}
 
 	go func() {
-		r.recordClusterMetrics(ctx, nn)
+		defer internal.LogPanic("node metrics recorder")
+		r.recordClusterMetrics(ctx, sink, nn)
+		t := time.NewTicker(seriesRecordRate)
+		defer t.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(seriesRecordRate):
-				r.recordClusterMetrics(ctx, nn)
+			case <-t.C:
+				r.recordClusterMetrics(ctx, sink, nn)
 			}
 		}
 	}()
@@ -170,7 +215,7 @@ func (r *Recorder) recordNodeMetrics(ctx context.Context) error {
 	return nil
 }
 
-func (r *Recorder) recordClusterMetrics(ctx context.Context, nn *v1.NodeList) {
+func (r *Recorder) recordClusterMetrics(ctx context.Context, sink *mxSink, nn *v1.NodeList) {
 	dial := client.DialMetrics(r.conn)
 	nmx, err := dial.FetchNodesMetrics(ctx)
 	if err != nil {
@@ -199,25 +244,23 @@ func (r *Recorder) recordClusterMetrics(ctx context.Context, nn *v1.NodeList) {
 	if len(nn.Items) > 0 {
 		r.series.Add(pt.Time, pt, seriesCacheExpiry)
 	}
-	r.mx.Lock()
-	defer r.mx.Unlock()
-	if r.mxChan != nil {
-		r.mxChan <- TimeSeries{pt}
-	}
+	sink.send(TimeSeries{pt})
 }
 
-func (r *Recorder) recordPodMetrics(ctx context.Context, ns string) error {
+func (r *Recorder) recordPodMetrics(ctx context.Context, sink *mxSink, ns string) error {
 	go func() {
-		if err := r.recordPodsMetrics(ctx, ns); err != nil {
+		defer internal.LogPanic("pod metrics recorder")
+		if err := r.recordPodsMetrics(ctx, sink, ns); err != nil {
 			slog.Error("Record pod metrics failed", slogs.Error, err)
 		}
+		t := time.NewTicker(seriesRecordRate)
+		defer t.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(seriesRecordRate):
-				// case <-time.After(5 * time.Second):
-				if err := r.recordPodsMetrics(ctx, ns); err != nil {
+			case <-t.C:
+				if err := r.recordPodsMetrics(ctx, sink, ns); err != nil {
 					slog.Error("Record pod metrics failed", slogs.Error, err)
 				}
 			}
@@ -227,7 +270,7 @@ func (r *Recorder) recordPodMetrics(ctx context.Context, ns string) error {
 	return nil
 }
 
-func (r *Recorder) recordPodsMetrics(ctx context.Context, ns string) error {
+func (r *Recorder) recordPodsMetrics(ctx context.Context, sink *mxSink, ns string) error {
 	f, ok := ctx.Value(internal.KeyFactory).(Factory)
 	if !ok {
 		return errors.New("expecting factory in context")
@@ -262,11 +305,7 @@ func (r *Recorder) recordPodsMetrics(ctx context.Context, ns string) error {
 		pt.Value.AllocatableCPU = pt.Value.CurrentCPU
 		pt.Value.AllocatableMEM = pt.Value.CurrentMEM
 		r.series.Add(pt.Time, pt, seriesCacheExpiry)
-		r.mx.Lock()
-		defer r.mx.Unlock()
-		if r.mxChan != nil {
-			r.mxChan <- TimeSeries{pt}
-		}
+		sink.send(TimeSeries{pt})
 	}
 
 	return nil

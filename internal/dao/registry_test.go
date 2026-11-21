@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func TestMetaFor(t *testing.T) {
@@ -156,4 +157,37 @@ func TestIsScalableGVR(t *testing.T) {
 			assert.Equal(t, u.e, isScalable(u.gvr))
 		})
 	}
+}
+
+func TestCRDSummary(t *testing.T) {
+	u := &unstructured.Unstructured{Object: map[string]any{
+		"spec": map[string]any{
+			"group": "fred.com",
+			"names": map[string]any{"kind": "Blee", "plural": "blees"},
+			"versions": []any{
+				map[string]any{
+					"name":         "v1",
+					"served":       true,
+					"subresources": map[string]any{"scale": map[string]any{}},
+					"schema":       map[string]any{"openAPIV3Schema": map[string]any{"type": "object"}},
+				},
+				map[string]any{"name": "v1beta1", "served": false, "deprecated": true},
+			},
+		},
+	}}
+
+	crd := crdSummary(u)
+	assert.Equal(t, "fred.com", crd.Spec.Group)
+	assert.Equal(t, "Blee", crd.Spec.Names.Kind)
+	assert.Equal(t, "blees", crd.Spec.Names.Plural)
+	require.Len(t, crd.Spec.Versions, 2)
+	assert.True(t, crd.Spec.Versions[0].Served)
+	require.NotNil(t, crd.Spec.Versions[0].Subresources)
+	assert.NotNil(t, crd.Spec.Versions[0].Subresources.Scale)
+	assert.True(t, crd.Spec.Versions[1].Deprecated)
+	assert.Nil(t, crd.Spec.Versions[1].Subresources)
+
+	m := ResourceMetas{client.NewGVR("fred.com/v1/blees"): &metav1.APIResource{Name: "blees"}}
+	addCRDProperties(m, &crd)
+	assert.Contains(t, m[client.NewGVR("fred.com/v1/blees")].Categories, scaleCat)
 }

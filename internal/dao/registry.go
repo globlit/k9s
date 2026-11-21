@@ -17,7 +17,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -49,12 +48,6 @@ var scalableRes = sets.New(client.DpGVR, client.StsGVR, client.RsGVR, client.RcG
 
 // ResourceMetas represents a collection of resource metadata.
 type ResourceMetas map[*client.GVR]*metav1.APIResource
-
-func (m ResourceMetas) clear() {
-	for k := range m {
-		delete(m, k)
-	}
-}
 
 // MetaAccess tracks resources metadata.
 var MetaAccess = NewMeta()
@@ -116,6 +109,22 @@ func (m *Meta) GVK2GVR(gv schema.GroupVersion, kind string) (*client.GVR, bool, 
 	return client.NoGVR, false, false
 }
 
+// GK2GVR resolves a group and kind to the server preferred resource, for
+// references that carry no API version (e.g. Flux sourceRefs). Only
+// preferred versions are registered, so the match is unambiguous.
+func (m *Meta) GK2GVR(group, kind string) (*client.GVR, bool) {
+	m.mx.RLock()
+	defer m.mx.RUnlock()
+
+	for gvr, meta := range m.resMetas {
+		if meta.Group == group && meta.Kind == kind {
+			return gvr, true
+		}
+	}
+
+	return client.NoGVR, false
+}
+
 // IsNamespaced checks if a given resource is namespaced.
 func (m *Meta) IsNamespaced(gvr *client.GVR) (bool, error) {
 	res, err := m.MetaFor(gvr)
@@ -162,18 +171,22 @@ func IsScalable(m *metav1.APIResource) bool {
 
 // LoadResources hydrates server preferred+CRDs resource metadata.
 func (m *Meta) LoadResources(f Factory) error {
-	m.mx.Lock()
-	defer m.mx.Unlock()
-
-	m.resMetas.clear()
-	if err := loadPreferred(f, m.resMetas); err != nil {
+	// Build the new registry off-lock and swap it in: readers (command
+	// prompt, views) never block on discovery, and a failed reload keeps the
+	// previous registry instead of leaving it empty.
+	metas := make(ResourceMetas)
+	if err := loadPreferred(f, metas); err != nil {
 		return err
 	}
-	loadNonResource(m.resMetas)
+	loadNonResource(metas)
 
 	// We've actually loaded all the CRDs in loadPreferred, and we're now adding
 	// some additional CRD properties on top of that.
-	loadCRDs(f, m.resMetas)
+	loadCRDs(f, metas)
+
+	m.mx.Lock()
+	m.resMetas = metas
+	m.mx.Unlock()
 
 	return nil
 }
@@ -388,14 +401,41 @@ func loadCRDs(f Factory, m ResourceMetas) {
 	}
 
 	for _, o := range oo {
-		var crd apiext.CustomResourceDefinition
-		err = runtime.DefaultUnstructuredConverter.FromUnstructured(o.(*unstructured.Unstructured).Object, &crd)
-		if err != nil {
-			slog.Error("CRD conversion failed", slogs.Error, err)
+		u, ok := o.(*unstructured.Unstructured)
+		if !ok {
 			continue
 		}
+		crd := crdSummary(u)
 		addCRDProperties(m, &crd)
 	}
+}
+
+// crdSummary extracts the few CRD fields k9s needs. Reloads happen
+// periodically and a full typed conversion would decode every OpenAPI schema.
+func crdSummary(u *unstructured.Unstructured) apiext.CustomResourceDefinition {
+	var crd apiext.CustomResourceDefinition
+	crd.Spec.Group, _, _ = unstructured.NestedString(u.Object, "spec", "group")
+	crd.Spec.Names.Kind, _, _ = unstructured.NestedString(u.Object, "spec", "names", "kind")
+	crd.Spec.Names.Plural, _, _ = unstructured.NestedString(u.Object, "spec", "names", "plural")
+	vv, _, _ := unstructured.NestedSlice(u.Object, "spec", "versions")
+	for _, v := range vv {
+		vm, ok := v.(map[string]any)
+		if !ok {
+			continue
+		}
+		var ver apiext.CustomResourceDefinitionVersion
+		ver.Name, _, _ = unstructured.NestedString(vm, "name")
+		ver.Served, _, _ = unstructured.NestedBool(vm, "served")
+		ver.Deprecated, _, _ = unstructured.NestedBool(vm, "deprecated")
+		if _, ok, _ := unstructured.NestedMap(vm, "subresources", "scale"); ok {
+			ver.Subresources = &apiext.CustomResourceSubresources{
+				Scale: new(apiext.CustomResourceSubresourceScale),
+			}
+		}
+		crd.Spec.Versions = append(crd.Spec.Versions, ver)
+	}
+
+	return crd
 }
 
 func addCRDProperties(m ResourceMetas, crd *apiext.CustomResourceDefinition) {
