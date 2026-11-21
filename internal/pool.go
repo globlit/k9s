@@ -24,7 +24,7 @@ type WorkerPool struct {
 }
 
 func NewWorkerPool(ctx context.Context, size int) *WorkerPool {
-	_, cancelFn := context.WithCancel(ctx)
+	ctx, cancelFn := context.WithCancel(ctx)
 
 	p := WorkerPool{
 		semC:     make(chan struct{}, size),
@@ -64,11 +64,11 @@ func (p *WorkerPool) Add(job jobFn) {
 }
 
 func (p *WorkerPool) Drain() []error {
+	p.wg.Wait()
 	if p.cancelFn != nil {
 		p.cancelFn()
 		p.cancelFn = nil
 	}
-	p.wg.Wait()
 	close(p.semC)
 	close(p.errC)
 	p.wge.Wait()

@@ -96,7 +96,8 @@ func (*Pod) containerRefs(ctx context.Context, parent *TreeNode, ns string, spec
 		}
 	}
 	for i := range len(spec.EphemeralContainers) {
-		if err := cre.Render(ctx, ns, render.ContainerRes{Container: &spec.Containers[i]}); err != nil {
+		co := v1.Container(spec.EphemeralContainers[i].EphemeralContainerCommon)
+		if err := cre.Render(ctx, ns, render.ContainerRes{Container: &co}); err != nil {
 			return err
 		}
 	}

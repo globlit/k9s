@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"regexp"
 	"strings"
 
 	"github.com/derailed/k9s/internal"
@@ -764,7 +763,9 @@ func (x *Xray) resourceDelete(gvr *client.GVR, spec *xray.NodeSpec, msg string) 
 			x.app.Flash().Errf("Delete failed with `%s", err)
 		} else {
 			x.app.Flash().Infof("%s `%s deleted successfully", x.GVR(), spec.Path())
-			x.app.factory.DeleteForwarder(spec.Path())
+			if gvr == client.PodGVR {
+				x.app.factory.DeleteForwarder(spec.Path())
+			}
 		}
 		x.Refresh()
 	}, func() {})
@@ -781,7 +782,7 @@ func fuzzyFilter(q, path string) bool {
 }
 
 func rxFilter(q, path string) bool {
-	rx := regexp.MustCompile(`(?i)` + q)
+	rx, _ := internal.CompileFilterRx(q)
 	tokens := strings.Split(path, xray.PathSeparator)
 	for _, t := range tokens {
 		if rx.MatchString(t) {
@@ -794,7 +795,7 @@ func rxFilter(q, path string) bool {
 
 func rxInverseFilter(q, path string) bool {
 	q = strings.TrimSpace(q[1:])
-	rx := regexp.MustCompile(`(?i)` + q)
+	rx, _ := internal.CompileFilterRx(q)
 	tokens := strings.Split(path, xray.PathSeparator)
 	for _, t := range tokens {
 		if rx.MatchString(t) {

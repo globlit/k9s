@@ -121,6 +121,9 @@ func (t *TableData) Sort(sc SortColumn) {
 }
 
 func (t *TableData) Header() Header {
+	t.mx.RLock()
+	defer t.mx.RUnlock()
+
 	return t.header
 }
 
@@ -172,8 +175,9 @@ func (t *TableData) rxFilter(q string, inverse bool) (*RowEvents, error) {
 	if inverse {
 		q = q[1:]
 	}
-	rx, err := regexp.Compile(`(?i)(` + q + `)`)
-	if err != nil {
+	rx, ok := internal.CompileFilterRx(q)
+	if !ok {
+		_, err := regexp.Compile(q)
 		return nil, fmt.Errorf("invalid rx filter %q: %w", q, err)
 	}
 
@@ -305,6 +309,9 @@ func (t *TableData) RowCount() int {
 
 // IndexOfHeader return the index of the header.
 func (t *TableData) IndexOfHeader(h string) (int, bool) {
+	t.mx.RLock()
+	defer t.mx.RUnlock()
+
 	return t.header.IndexOf(h, false)
 }
 
