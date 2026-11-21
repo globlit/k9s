@@ -4,6 +4,7 @@
 package view
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/globlit/k9s/internal/client"
@@ -34,9 +35,14 @@ func NewReplicaSet(gvr *client.GVR) ResourceViewer {
 }
 
 func (r *ReplicaSet) bindKeys(aa *ui.KeyActions) {
-	aa.Bulk(ui.KeyMap{
-		tcell.KeyCtrlL: ui.NewKeyAction("Rollback", r.rollbackCmd, true),
-	})
+	if r.App().Config.IsReadOnly() {
+		return
+	}
+	aa.Add(tcell.KeyCtrlL, ui.NewKeyActionWithOpts("Rollback", r.rollbackCmd,
+		ui.ActionOpts{
+			Visible:   true,
+			Dangerous: true,
+		}))
 }
 
 func (*ReplicaSet) showPods(app *App, _ ui.Tabular, _ *client.GVR, path string) {
@@ -63,12 +69,16 @@ func (r *ReplicaSet) rollbackCmd(evt *tcell.EventKey) *tcell.EventKey {
 		r.App().Flash().Infof("Rolling back %s %s", r.GVR(), path)
 		var drs dao.ReplicaSet
 		drs.Init(r.App().factory, r.GVR())
-		if err := drs.Rollback(path); err != nil {
-			r.App().Flash().Err(err)
-		} else {
-			r.App().Flash().Infof("%s successfully rolled back", path)
-		}
-		r.Refresh()
+		runAsync(context.Background(), r.App(), []string{path}, "rollback",
+			func(context.Context, string) error { return drs.Rollback(path) },
+			func(_ []string, errs []error) {
+				if len(errs) > 0 {
+					r.App().Flash().Err(errs[0])
+				} else {
+					r.App().Flash().Infof("%s successfully rolled back", path)
+				}
+				r.Refresh()
+			})
 	}, func() {})
 
 	return nil
