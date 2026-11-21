@@ -43,9 +43,18 @@ func userAgent() string {
 
 // Config tracks a kubernetes configuration.
 type Config struct {
-	flags *genericclioptions.ConfigFlags
-	mx    sync.RWMutex
-	proxy func(*http.Request) (*url.URL, error)
+	flags   *genericclioptions.ConfigFlags
+	mx      sync.RWMutex
+	proxyMx sync.RWMutex
+	proxy   func(*http.Request) (*url.URL, error)
+
+	// CLI credential overrides (--token, --insecure-skip-tls-verify) belong
+	// to the context k9s was started on. They must not follow a context
+	// switch, or the token would be sent to another API server.
+	credsCtx           string
+	credsSaved         bool
+	bearerToken        *string
+	insecureSkipVerify *bool
 }
 
 // NewConfig returns a new k8s config or an error if the flags are invalid.
@@ -76,8 +85,11 @@ func (c *Config) RESTConfig() (*restclient.Config, error) {
 	if cfg.UserAgent == "" {
 		cfg.UserAgent = userAgent()
 	}
-	if c.proxy != nil {
-		cfg.Proxy = c.proxy
+	c.proxyMx.RLock()
+	proxy := c.proxy
+	c.proxyMx.RUnlock()
+	if proxy != nil {
+		cfg.Proxy = proxy
 	}
 	if cfg.QPS == 0 {
 		cfg.QPS = defaultQPS
@@ -117,8 +129,14 @@ func (c *Config) SwitchContext(name string) error {
 	flags.Impersonate = c.flags.Impersonate
 	flags.ImpersonateGroup = c.flags.ImpersonateGroup
 	flags.ImpersonateUID = c.flags.ImpersonateUID
-	flags.Insecure = c.flags.Insecure
-	flags.BearerToken = c.flags.BearerToken
+	if !c.credsSaved {
+		c.credsSaved = true
+		c.credsCtx, _ = c.CurrentContextName()
+		c.bearerToken, c.insecureSkipVerify = c.flags.BearerToken, c.flags.Insecure
+	}
+	if name == c.credsCtx {
+		flags.Insecure, flags.BearerToken = c.insecureSkipVerify, c.bearerToken
+	}
 
 	c.flags = flags
 
@@ -215,8 +233,11 @@ func (c *Config) GetContext(n string) (*api.Context, error) {
 	return nil, fmt.Errorf("getcontext - invalid context specified: %q", n)
 }
 
-// SetProxy sets the proxy function.
+// SetProxy sets the proxy function. A nil proxy restores the default
+// (environment) proxy settings.
 func (c *Config) SetProxy(proxy func(*http.Request) (*url.URL, error)) {
+	c.proxyMx.Lock()
+	defer c.proxyMx.Unlock()
 	c.proxy = proxy
 }
 
@@ -268,6 +289,9 @@ func (c *Config) RenameContext(oldCtx, newCtx string) error {
 	current, err := c.CurrentContextName()
 	if err != nil {
 		return err
+	}
+	if c.credsSaved && c.credsCtx == oldCtx {
+		c.credsCtx = newCtx
 	}
 	if current == oldCtx {
 		return c.SwitchContext(newCtx)

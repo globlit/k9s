@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -28,11 +29,16 @@ import (
 )
 
 const (
-	cacheSize     = 100
-	cacheExpiry   = 5 * time.Minute
-	cacheMXAPIKey = "metricsAPI"
-	serverVersion = "serverVersion"
-	cacheNSKey    = "validNamespaces"
+	cacheSize   = 100
+	cacheExpiry = 5 * time.Minute
+	// discoveryCacheExpiry is the on-disk discovery cache TTL (same as
+	// kubectl). With 5m nearly every launch re-fetched discovery, which is
+	// slow on constrained networks. New CRDs are still picked up live
+	// through the CRD informer, and the cache is invalidated on reconnect.
+	discoveryCacheExpiry = 6 * time.Hour
+	cacheMXAPIKey        = "metricsAPI"
+	serverVersion        = "serverVersion"
+	cacheNSKey           = "validNamespaces"
 )
 
 var supportedMetricsAPIVersions = []string{"v1beta1"}
@@ -303,6 +309,17 @@ func (a *APIClient) ValidNamespaceNames() (NamespaceNames, error) {
 	return nns, nil
 }
 
+// pingTimeout bounds health checks so a dead link is detected quickly instead
+// of waiting for the (default 2m) api call timeout.
+func (a *APIClient) pingTimeout() time.Duration {
+	const maxPing = 10 * time.Second
+	if t := a.config.CallTimeout(); t > 0 && t < maxPing {
+		return t
+	}
+
+	return maxPing
+}
+
 // CheckConnectivity return true if api server is cool or false otherwise.
 func (a *APIClient) CheckConnectivity() bool {
 	defer func() {
@@ -314,11 +331,29 @@ func (a *APIClient) CheckConnectivity() bool {
 		}
 	}()
 
+	// Fast path: while healthy, ping through the existing client. Building
+	// a new clientset every check opens a fresh TCP/TLS connection (and a
+	// proxy CONNECT when a proxy is configured, as transports with a proxy
+	// func are never cached by client-go).
+	if a.getConnOK() {
+		if c := a.getClient(); c != nil && c.Discovery() != nil {
+			if rc := c.Discovery().RESTClient(); rc != nil && !reflect.ValueOf(rc).IsNil() {
+				ctx, cancel := context.WithTimeout(context.Background(), a.pingTimeout())
+				defer cancel()
+				err := rc.Get().AbsPath("/version").Do(ctx).Error()
+				if err == nil {
+					return true
+				}
+				slog.Warn("Connectivity check failed", slogs.Error, err)
+			}
+		}
+	}
+
 	cfg, err := a.config.RESTConfig()
 	if err != nil {
 		slog.Error("RestConfig load failed", slogs.Error, err)
-		a.connOK = false
-		return a.connOK
+		a.setConnOK(false)
+		return false
 	}
 	cfg.Timeout = a.config.CallTimeout()
 	client, err := kubernetes.NewForConfig(cfg)
@@ -508,7 +543,7 @@ func (a *APIClient) CachedDiscovery() (*disk.CachedDiscoveryClient, error) {
 	httpCacheDir := filepath.Join(baseCacheDir, "http")
 	discCacheDir := filepath.Join(baseCacheDir, "discovery", toHostDir(cfg.Host))
 
-	c, err := disk.NewCachedDiscoveryClientForConfig(cfg, discCacheDir, httpCacheDir, cacheExpiry)
+	c, err := disk.NewCachedDiscoveryClientForConfig(cfg, discCacheDir, httpCacheDir, discoveryCacheExpiry)
 	if err != nil {
 		return nil, err
 	}
@@ -616,21 +651,14 @@ func (a *APIClient) supportsMetricsResources() error {
 		return noMetricServerErr
 	}
 
+	apiGroups, err := a.serverGroups()
+	if err != nil {
+		// Don't cache transient failures as "no metrics server".
+		return err
+	}
 	defer func() {
 		a.cache.Add(cacheMXAPIKey, supported, cacheExpiry)
 	}()
-
-	dial, err := a.Dial()
-	if err != nil {
-		if a.HasActiveContext() {
-			slog.Warn("Unable to dial API client for metrics", slogs.Error, err)
-		}
-		return err
-	}
-	apiGroups, err := dial.Discovery().ServerGroups()
-	if err != nil {
-		return err
-	}
 	for i := range apiGroups.Groups {
 		if apiGroups.Groups[i].Name != metricsapi.GroupName {
 			continue
@@ -642,6 +670,26 @@ func (a *APIClient) supportsMetricsResources() error {
 	}
 
 	return metricsUnsupportedErr
+}
+
+// serverGroups returns the api groups, preferring the on-disk discovery cache
+// to avoid a full discovery round trip at startup.
+func (a *APIClient) serverGroups() (*metav1.APIGroupList, error) {
+	// Dial first: it builds and stores the shared client (no network call).
+	dial, err := a.Dial()
+	if err != nil {
+		if a.HasActiveContext() {
+			slog.Warn("Unable to dial API client for metrics", slogs.Error, err)
+		}
+		return nil, err
+	}
+	if dc, err := a.CachedDiscovery(); err == nil {
+		if gg, err := dc.ServerGroups(); err == nil {
+			return gg, nil
+		}
+	}
+
+	return dial.Discovery().ServerGroups()
 }
 
 func checkMetricsVersion(grp *metav1.APIGroup) bool {

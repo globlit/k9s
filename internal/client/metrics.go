@@ -138,14 +138,35 @@ func (m *MetricsServer) FetchNodesMetricsMap(ctx context.Context) (NodesMetricsM
 		return nil, err
 	}
 
+	const key = "nodes-map"
+	if e, ok := m.cache.Get(key); ok {
+		if c, ok := e.(nodesMapEntry); ok && c.list == mm {
+			return c.m, nil
+		}
+	}
 	hh := make(NodesMetricsMap, len(mm.Items))
 	for i := range mm.Items {
 		mx := mm.Items[i]
 		hh[mx.Name] = &mx
 	}
+	m.cache.Add(key, nodesMapEntry{list: mm, m: hh}, mxCacheExpiry)
 
 	return hh, nil
 }
+
+// Lookup maps are cached next to the metrics list they were built from and
+// rebuilt only when that list is re-fetched: views look metrics up on every
+// refresh, often for a single pod. Callers must treat them as read-only.
+type (
+	nodesMapEntry struct {
+		list *mv1beta1.NodeMetricsList
+		m    NodesMetricsMap
+	}
+	podsMapEntry struct {
+		list *mv1beta1.PodMetricsList
+		m    PodsMetricsMap
+	}
+)
 
 // FetchNodesMetrics return all metrics for nodes.
 func (m *MetricsServer) FetchNodesMetrics(ctx context.Context) (*mv1beta1.NodeMetricsList, error) {
@@ -217,11 +238,18 @@ func (m *MetricsServer) FetchPodsMetricsMap(ctx context.Context, ns string) (Pod
 		return nil, err
 	}
 
+	key := FQN(ns, "pods-map")
+	if e, ok := m.cache.Get(key); ok {
+		if c, ok := e.(podsMapEntry); ok && c.list == mm {
+			return c.m, nil
+		}
+	}
 	hh := make(PodsMetricsMap, len(mm.Items))
 	for i := range mm.Items {
 		mx := mm.Items[i]
 		hh[FQN(mx.Namespace, mx.Name)] = &mx
 	}
+	m.cache.Add(key, podsMapEntry{list: mm, m: hh}, mxCacheExpiry)
 
 	return hh, nil
 }

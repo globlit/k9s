@@ -340,3 +340,26 @@ func cp(src, dst string) error {
 
 	return os.WriteFile(dst, data, 0600)
 }
+
+func TestConfigSwitchContextScopesCLICredentials(t *testing.T) {
+	cluster, token, insecure := "duh", "s3cr3t", true
+	flags := genericclioptions.ConfigFlags{
+		KubeConfig:  &kubeConfig,
+		Context:     &cluster,
+		BearerToken: &token,
+		Insecure:    &insecure,
+	}
+
+	cfg := client.NewConfig(&flags)
+	require.NoError(t, cfg.SwitchContext("blee"))
+	f := cfg.Flags()
+	assert.True(t, f.BearerToken == nil || *f.BearerToken == "")
+	assert.True(t, f.Insecure == nil || !*f.Insecure)
+
+	require.NoError(t, cfg.SwitchContext("duh"))
+	f = cfg.Flags()
+	require.NotNil(t, f.BearerToken)
+	assert.Equal(t, token, *f.BearerToken)
+	require.NotNil(t, f.Insecure)
+	assert.True(t, *f.Insecure)
+}

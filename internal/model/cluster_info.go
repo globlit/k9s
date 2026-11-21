@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -83,6 +84,9 @@ type ClusterInfo struct {
 	listeners []ClusterInfoListener
 	cache     *cache.LRUExpireCache
 	mx        sync.RWMutex
+	// refreshMx serializes refreshes: startup and the periodic updater
+	// can overlap, and each one diffs against the previous snapshot.
+	refreshMx sync.Mutex
 }
 
 // NewClusterInfo returns a new instance.
@@ -108,9 +112,10 @@ func (c *ClusterInfo) fetchK9sLatestRev() string {
 	latestRev, err := fetchLatestRev()
 	if err != nil {
 		slog.Warn("k9s latest rev fetch failed", slogs.Error, err)
-	} else {
-		c.cache.Add(k9sLatestRevKey, latestRev, cacheExpiry)
 	}
+	// Cache failures too: on air-gapped or proxied networks every cluster
+	// refresh would otherwise stall on this request again.
+	c.cache.Add(k9sLatestRevKey, latestRev, cacheExpiry)
 
 	return latestRev
 }
@@ -121,15 +126,21 @@ func (c *ClusterInfo) Reset(f dao.Factory) {
 		return
 	}
 
+	// Not mid-refresh: Refresh reads c.cluster without c.mx.
+	c.refreshMx.Lock()
 	c.mx.Lock()
 	c.cluster, c.data = NewCluster(f), NewClusterMeta()
 	c.mx.Unlock()
+	c.refreshMx.Unlock()
 
 	c.Refresh()
 }
 
 // Refresh fetches the latest cluster meta.
 func (c *ClusterInfo) Refresh() {
+	c.refreshMx.Lock()
+	defer c.refreshMx.Unlock()
+
 	data := NewClusterMeta()
 	if c.factory.Client().ConnectionOK() {
 		data.Context = c.cluster.ContextName()
@@ -157,8 +168,11 @@ func (c *ClusterInfo) Refresh() {
 		data.K9sLatest = ""
 	}
 
-	if c.data.Deltas(data) {
-		c.fireMetaChanged(c.data, data)
+	c.mx.RLock()
+	prev := c.data
+	c.mx.RUnlock()
+	if prev.Deltas(data) {
+		c.fireMetaChanged(prev, data)
 	} else {
 		c.fireNoMetaChanged(data)
 	}
@@ -220,7 +234,10 @@ func fetchLatestRev() (string, error) {
 		}
 	}()
 
-	b, err := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status fetching latest rev: %s", resp.Status)
+	}
+	b, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return "", err
 	}
@@ -229,9 +246,9 @@ func fetchLatestRev() (string, error) {
 		return "", err
 	}
 
-	if v, ok := m["name"]; ok {
-		slog.Debug("K9s latest rev", slogs.Revision, v.(string))
-		return v.(string), nil
+	if v, ok := m["name"].(string); ok {
+		slog.Debug("K9s latest rev", slogs.Revision, v)
+		return v, nil
 	}
 
 	return "", errors.New("no version found")

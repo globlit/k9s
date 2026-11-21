@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
+	"sync"
 
 	"github.com/derailed/k9s/internal/client"
 	"github.com/derailed/k9s/internal/config/data"
@@ -143,8 +145,48 @@ func (h *HelmChart) Uninstall(path string, keepHist bool) error {
 	return nil
 }
 
-// ensureHelmConfig return a new configuration.
+var (
+	helmCfgMx    sync.Mutex
+	helmCfgCache = make(map[string]*action.Configuration)
+)
+
+const maxHelmCfgCache = 32
+
+// ensureHelmConfig returns a helm configuration for the given flags and
+// namespace. Building one parses the kubeconfig and creates new API clients
+// (new TCP/TLS connections), so they are cached instead of being rebuilt on
+// every refresh.
 func ensureHelmConfig(flags *genericclioptions.ConfigFlags, ns string) (*action.Configuration, error) {
+	key := strings.Join([]string{
+		deref(flags.Context), deref(flags.KubeConfig), deref(flags.APIServer),
+		deref(flags.Impersonate), deref(flags.BearerToken), ns, os.Getenv("HELM_DRIVER"),
+	}, "|")
+
+	helmCfgMx.Lock()
+	defer helmCfgMx.Unlock()
+	if cfg, ok := helmCfgCache[key]; ok {
+		return cfg, nil
+	}
+	cfg, err := newHelmConfig(flags, ns)
+	if err != nil {
+		return nil, err
+	}
+	if len(helmCfgCache) >= maxHelmCfgCache {
+		clear(helmCfgCache)
+	}
+	helmCfgCache[key] = cfg
+
+	return cfg, nil
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func newHelmConfig(flags *genericclioptions.ConfigFlags, ns string) (*action.Configuration, error) {
 	settings := &genericclioptions.ConfigFlags{
 		Namespace:        &ns,
 		Context:          flags.Context,
