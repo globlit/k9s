@@ -7,6 +7,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"unicode"
 )
 
 const (
@@ -98,6 +99,9 @@ func (a args) String() string {
 		case filterKey:
 			v = filterFlag + v
 		case fuzzyKey:
+			if strings.ContainsFunc(v, unicode.IsSpace) {
+				v = "'" + v + "'"
+			}
 			v = fuzzyFlag + " " + v
 		case contextKey:
 			v = contextFlag + v
