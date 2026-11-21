@@ -227,11 +227,27 @@ func TestValuesRefreshFiresOnce(t *testing.T) {
 	assert.Equal(t, 2, ch)
 }
 
-func TestRevValuesUsesRevision(t *testing.T) {
-	t.Skip("bug: NewRevValues drops rev; HelmHistory.GetValues rejects the path without :rev, so the view is empty")
+type revValuer struct {
+	dao.HelmHistory
+	path string
+}
 
-	_, err := getHelmHistDao().GetValues("ns1/r1", true)
-	require.NoError(t, err)
+func (r *revValuer) GetValues(path string, _ bool) ([]byte, error) {
+	r.path = path
+	return []byte("a: 1"), nil
+}
+
+func TestRevValuesUsesRevision(t *testing.T) {
+	old := Registry[client.HmhGVR]
+	t.Cleanup(func() { Registry[client.HmhGVR] = old })
+	var r revValuer
+	m := old
+	m.DAO = &r
+	Registry[client.HmhGVR] = m
+
+	v := NewRevValues(client.HmhGVR, "ns1/r1", "3")
+	assert.Equal(t, "ns1/r1:3", r.path)
+	assert.Equal(t, []string{"a: 1"}, v.Peek())
 }
 
 type tableRec struct {
