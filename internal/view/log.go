@@ -4,6 +4,7 @@
 package view
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -51,6 +52,84 @@ type Log struct {
 	follow            bool
 	columnLock        bool
 	requestOneRefresh bool
+	// placeholder is true while the "waiting for logs" message is shown.
+	// Only touched on the UI goroutine. Replaces comparing the full text
+	// buffer (up to logger.buffer lines) on every flush.
+	placeholder bool
+	feed        logFeed
+}
+
+// logFeed coalesces log updates so at most one UI update is pending.
+//
+// Writing to a tview TextView invalidates its line index and the next draw
+// re-indexes the whole buffer (~150ms for 5k lines). Queuing one draw per
+// model flush on a chatty multi-pod stream backs up the UI goroutine until
+// the view freezes. Instead, lines accumulate here and are drained by a
+// single pending update, paced by the measured cost of the previous draw.
+type logFeed struct {
+	mx        sync.Mutex
+	pending   [][]byte
+	clear     bool
+	scheduled bool
+	lastEnd   time.Time
+	cost      time.Duration
+	maxLines  int
+}
+
+const (
+	minLogDrawGap = 50 * time.Millisecond
+	maxLogDrawGap = time.Second
+)
+
+// add queues lines, dropping the oldest beyond maxLines (the view would
+// drop them anyway).
+func (f *logFeed) add(lines [][]byte) {
+	f.mx.Lock()
+	defer f.mx.Unlock()
+
+	f.pending = append(f.pending, lines...)
+	if f.maxLines > 0 && len(f.pending) > f.maxLines {
+		f.pending = append([][]byte(nil), f.pending[len(f.pending)-f.maxLines:]...)
+	}
+}
+
+// reset drops pending lines and requests the view be cleared first.
+func (f *logFeed) reset() {
+	f.mx.Lock()
+	defer f.mx.Unlock()
+
+	f.pending, f.clear = nil, true
+}
+
+// next reports whether an update must be scheduled and after what delay.
+func (f *logFeed) next() (bool, time.Duration) {
+	f.mx.Lock()
+	defer f.mx.Unlock()
+
+	if f.scheduled || (len(f.pending) == 0 && !f.clear) {
+		return false, 0
+	}
+	f.scheduled = true
+	gap := min(max(f.cost, minLogDrawGap), maxLogDrawGap)
+
+	return true, max(gap-time.Since(f.lastEnd), 0)
+}
+
+func (f *logFeed) take() (lines [][]byte, clear bool) {
+	f.mx.Lock()
+	defer f.mx.Unlock()
+
+	lines, clear = f.pending, f.clear
+	f.pending, f.clear = nil, false
+
+	return
+}
+
+func (f *logFeed) done(cost time.Duration) {
+	f.mx.Lock()
+	defer f.mx.Unlock()
+
+	f.cost, f.lastEnd, f.scheduled = cost, time.Now(), false
 }
 
 var _ model.Component = (*Log)(nil)
@@ -90,8 +169,10 @@ func (l *Log) Init(ctx context.Context) (err error) {
 	}
 	l.logs.SetBorderPadding(0, 0, 1, 1)
 	l.logs.SetText("[orange::d]" + logMessage)
+	l.placeholder = true
 	l.logs.SetWrap(l.app.Config.K9s.Logger.TextWrap)
 	l.logs.SetMaxLines(l.app.Config.K9s.Logger.BufferSize)
+	l.feed.maxLines = l.app.Config.K9s.Logger.BufferSize
 
 	l.ansiWriter = tview.ANSIWriter(l.logs, l.app.Styles.Views().Log.FgColor.String(), l.app.Styles.Views().Log.BgColor.String())
 	l.AddItem(l.logs, 0, 1, true)
@@ -119,7 +200,9 @@ func (l *Log) InCmdMode() bool {
 // LogCanceled indicates no more logs are coming.
 func (l *Log) LogCanceled() {
 	slog.Debug("Logs watcher canceled!")
-	l.Flush([][]byte{[]byte("\n🏁 [red::b]Stream exited! No more logs...")})
+	l.app.QueueUpdateDraw(func() {
+		l.Flush([][]byte{[]byte("\n🏁 [red::b]Stream exited! No more logs...")})
+	})
 }
 
 // LogStop disables log flushes.
@@ -139,10 +222,49 @@ func (l *Log) LogResume() {
 	l.cancelUpdates = false
 }
 
+// clearPlaceholder removes the waiting message. Must run on the UI goroutine.
+func (l *Log) clearPlaceholder() {
+	if l.placeholder {
+		l.placeholder = false
+		l.logs.Clear()
+	}
+}
+
 // LogCleared clears the logs.
 func (l *Log) LogCleared() {
-	l.app.QueueUpdateDraw(func() {
+	// Routed through the feed so a clear can never race with (and wipe)
+	// the lines that follow it.
+	l.feed.reset()
+	l.scheduleFeed()
+}
+
+func (l *Log) scheduleFeed() {
+	ok, delay := l.feed.next()
+	if !ok {
+		return
+	}
+	time.AfterFunc(delay, func() {
+		l.app.QueueUpdateDraw(l.drainFeed)
+	})
+}
+
+// drainFeed writes pending lines. Runs on the UI goroutine.
+func (l *Log) drainFeed() {
+	start := time.Now()
+	lines, clear := l.feed.take()
+	if clear {
+		l.placeholder = false
 		l.logs.Clear()
+	}
+	if len(lines) > 0 {
+		l.clearPlaceholder()
+		l.Flush(lines)
+	}
+	// Queued behind the draw triggered by this update, so it measures the
+	// full update+draw cost, which paces the next update.
+	l.app.QueueUpdate(func() {
+		l.feed.done(time.Since(start))
+		l.scheduleFeed()
 	})
 }
 
@@ -150,9 +272,7 @@ func (l *Log) LogCleared() {
 func (l *Log) LogFailed(err error) {
 	l.app.QueueUpdateDraw(func() {
 		l.app.Flash().Err(err)
-		if l.logs.GetText(true) == logMessage {
-			l.logs.Clear()
-		}
+		l.clearPlaceholder()
 		if _, err = l.ansiWriter.Write([]byte(tview.Escape(color.Colorize(err.Error(), color.Red)))); err != nil {
 			slog.Error("Log line write failed", slogs.Error, err)
 		}
@@ -161,18 +281,15 @@ func (l *Log) LogFailed(err error) {
 
 // LogChanged updates the logs.
 func (l *Log) LogChanged(lines [][]byte) {
-	l.app.QueueUpdateDraw(func() {
-		if l.logs.GetText(true) == logMessage {
-			l.logs.Clear()
-		}
-		l.Flush(lines)
-	})
+	l.feed.add(lines)
+	l.scheduleFeed()
 }
 
 // BufferCompleted indicates input was accepted.
 func (l *Log) BufferCompleted(text, _ string) {
+	// Called from the command buffer's debounce goroutine.
 	l.model.Filter(text)
-	l.updateTitle()
+	l.app.QueueUpdateDraw(l.updateTitle)
 }
 
 // BufferChanged indicates the buffer was changed.
@@ -359,12 +476,9 @@ func (l *Log) Flush(lines [][]byte) {
 	if l.requestOneRefresh {
 		l.requestOneRefresh = false
 	}
-	for i := range lines {
-		if l.cancelUpdates {
-			break
-		}
-		_, _ = l.ansiWriter.Write(lines[i])
-	}
+	// One write per batch: each Write goes through the ANSI parser and the
+	// TextView lock, so batching is much cheaper on chatty streams.
+	_, _ = l.ansiWriter.Write(bytes.Join(lines, nil))
 	if l.follow {
 		if l.columnLock {
 			// Enables end tracking without resetting column
@@ -441,14 +555,14 @@ func saveData(dir, fqn, logs string) (string, error) {
 
 	f := fmt.Sprintf("%s-%d.log", fqn, time.Now().UnixNano())
 	path := filepath.Join(dir, data.SanitizeFileName(f))
-	mod := os.O_CREATE | os.O_WRONLY
+	mod := os.O_CREATE | os.O_WRONLY | os.O_TRUNC
 	file, err := os.OpenFile(path, mod, 0600)
 	if err != nil {
 		slog.Error("Unable to save log file",
 			slogs.Path, path,
 			slogs.Error, err,
 		)
-		return "", nil
+		return "", err
 	}
 	defer func() {
 		if err := file.Close(); err != nil {

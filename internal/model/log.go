@@ -41,16 +41,29 @@ type LogsListener interface {
 
 // Log represents a resource logger.
 type Log struct {
-	factory      dao.Factory
-	lines        *dao.LogItems
-	listeners    []LogsListener
-	gvr          *client.GVR
-	logOptions   *dao.LogOptions
-	cancelFn     context.CancelFunc
-	mx           sync.RWMutex
+	factory    dao.Factory
+	lines      *dao.LogItems
+	listeners  []LogsListener
+	gvr        *client.GVR
+	logOptions *dao.LogOptions
+	cancelFn   context.CancelFunc
+	mx         sync.RWMutex
+	// lmx guards listeners independently of mx so listeners can be fired
+	// while mx is held.
+	lmx          sync.RWMutex
 	filter       string
-	lastSent     int
 	flushTimeout time.Duration
+	// maxLines caps the in-memory buffer (logger.buffer). Zero falls back to
+	// the tail count.
+	maxLines int
+	// total counts lines ever appended; sent is the value of total at the
+	// last flush. Unlike a buffer index, these never move when the buffer
+	// rotates, so lines are never silently dropped between flushes.
+	total, sent uint64
+	// flushCtx identifies the running flusher, if any.
+	flushCtx context.Context
+	// notifyMx serializes flushes so listeners always receive lines in order.
+	notifyMx sync.Mutex
 }
 
 // NewLog returns a new model.
@@ -89,7 +102,9 @@ func (l *Log) IsHead() bool {
 
 // ToggleShowTimestamp toggles to logs timestamps.
 func (l *Log) ToggleShowTimestamp(b bool) {
+	l.mx.Lock()
 	l.logOptions.ShowTimestamp = b
+	l.mx.Unlock()
 	l.Refresh()
 }
 
@@ -108,9 +123,26 @@ func (l *Log) SetSinceSeconds(ctx context.Context, i int64) {
 
 // Configure sets logger configuration.
 func (l *Log) Configure(opts config.Logger) {
+	l.mx.Lock()
+	defer l.mx.Unlock()
+
 	l.logOptions.Lines = opts.TailCount
 	l.logOptions.SinceSeconds = opts.SinceSeconds
 	l.logOptions.LogBufferSize = opts.LogBufferSize
+	l.maxLines = opts.BufferSize
+}
+
+// capacity returns the max number of lines kept in memory. Caller holds mx.
+func (l *Log) capacity() int {
+	c := l.maxLines
+	if tail := int(l.logOptions.Lines); tail > c {
+		c = tail
+	}
+	if c <= 0 {
+		c = config.MaxLogThreshold
+	}
+
+	return c
 }
 
 // GetPath returns resource path.
@@ -137,7 +169,7 @@ func (l *Log) Init(f dao.Factory) {
 func (l *Log) Clear() {
 	l.mx.Lock()
 	l.lines.Clear()
-	l.lastSent = 0
+	l.total, l.sent = 0, 0
 	l.mx.Unlock()
 
 	l.fireLogCleared()
@@ -145,10 +177,7 @@ func (l *Log) Clear() {
 
 // Refresh refreshes the logs.
 func (l *Log) Refresh() {
-	l.fireLogCleared()
-	ll := make([][]byte, l.lines.Len())
-	l.lines.Render(0, l.logOptions.ShowTimestamp, ll)
-	l.fireLogChanged(ll)
+	l.fireAll()
 }
 
 // Restart restarts the logger.
@@ -176,12 +205,10 @@ func (l *Log) Stop() {
 func (l *Log) Set(lines *dao.LogItems) {
 	l.mx.Lock()
 	l.lines.Merge(lines)
+	l.total += uint64(lines.Len())
 	l.mx.Unlock()
 
-	l.fireLogCleared()
-	ll := make([][]byte, l.lines.Len())
-	l.lines.Render(0, l.logOptions.ShowTimestamp, ll)
-	l.fireLogChanged(ll)
+	l.fireAll()
 }
 
 // ClearFilter resets the log filter if any.
@@ -190,10 +217,7 @@ func (l *Log) ClearFilter() {
 	l.filter = ""
 	l.mx.Unlock()
 
-	l.fireLogCleared()
-	ll := make([][]byte, l.lines.Len())
-	l.lines.Render(0, l.logOptions.ShowTimestamp, ll)
-	l.fireLogChanged(ll)
+	l.fireAll()
 }
 
 // Filter filters the model using either fuzzy or regexp.
@@ -202,8 +226,7 @@ func (l *Log) Filter(q string) {
 	l.filter = q
 	l.mx.Unlock()
 
-	l.fireLogCleared()
-	l.fireLogBuffChanged(0)
+	l.fireAll()
 }
 
 func (l *Log) cancel() {
@@ -227,7 +250,10 @@ func (l *Log) load(ctx context.Context) error {
 
 	l.cancel()
 	ctx = context.WithValue(ctx, internal.KeyFactory, l.factory)
-	ctx, l.cancelFn = context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(ctx)
+	l.mx.Lock()
+	l.cancelFn = cancel
+	l.mx.Unlock()
 
 	cc, err := loggable.TailLogs(ctx, l.logOptions)
 	if err != nil {
@@ -249,27 +275,43 @@ func (l *Log) Append(line *dao.LogItem) {
 	}
 	l.mx.Lock()
 	defer l.mx.Unlock()
+
 	l.logOptions.SinceTime = line.GetTimestamp()
-	if l.lines.Len() < int(l.logOptions.Lines) {
+	l.total++
+	if l.lines.Len() < l.capacity() {
 		l.lines.Add(line)
 		return
 	}
 	l.lines.Shift(line)
-	l.lastSent--
-	if l.lastSent < 0 {
-		l.lastSent = 0
-	}
 }
 
-// Notify fires of notifications to the listeners.
+// Notify sends lines appended since the last flush to the listeners.
 func (l *Log) Notify() {
-	l.mx.Lock()
-	defer l.mx.Unlock()
+	l.notifyMx.Lock()
+	defer l.notifyMx.Unlock()
 
-	if l.lastSent < l.lines.Len() {
-		l.fireLogBuffChanged(l.lastSent)
-		l.lastSent = l.lines.Len()
+	l.mx.Lock()
+	pending := l.total - l.sent
+	if pending == 0 {
+		l.mx.Unlock()
+		return
 	}
+	n := l.lines.Len()
+	index := 0
+	if pending < uint64(n) {
+		index = n - int(pending)
+	}
+	if pending > uint64(n) {
+		slog.Debug("Log lines rotated out before display", slogs.Count, pending-uint64(n))
+	}
+	l.sent = l.total
+	// Snapshot the new items so rendering and filtering happen outside the
+	// lock and never stall the stream readers.
+	batch := l.lines.Subset(index)
+	q, showTime := l.filter, l.logOptions.ShowTimestamp
+	l.mx.Unlock()
+
+	l.fireBatch(batch, q, showTime)
 }
 
 // ToggleAllContainers toggles to show all containers logs.
@@ -278,7 +320,11 @@ func (l *Log) ToggleAllContainers(ctx context.Context) {
 	l.Restart(ctx)
 }
 
+// updateLogs reads a single log stream into the buffer. Flushing to the
+// view is done by a single flusher shared by all streams.
 func (l *Log) updateLogs(ctx context.Context, c dao.LogChan) {
+	defer internal.LogPanic("log updater")
+	l.ensureFlusher(ctx)
 	for {
 		select {
 		case item, ok := <-c:
@@ -288,128 +334,159 @@ func (l *Log) updateLogs(ctx context.Context, c dao.LogChan) {
 				return
 			}
 			if item == dao.ItemEOF {
+				l.Notify()
 				l.fireCanceled()
 				return
 			}
 			l.Append(item)
-			var overflow bool
-			l.mx.RLock()
-			overflow = int64(l.lines.Len()-l.lastSent) > l.logOptions.Lines
-			l.mx.RUnlock()
-			if overflow {
-				l.Notify()
-			}
-		case <-time.After(l.flushTimeout):
-			l.Notify()
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
+// ensureFlusher starts the flusher for ctx unless one is already running.
+func (l *Log) ensureFlusher(ctx context.Context) {
+	l.mx.Lock()
+	if l.flushCtx == ctx {
+		l.mx.Unlock()
+		return
+	}
+	l.flushCtx = ctx
+	l.mx.Unlock()
+
+	go l.flusher(ctx)
+}
+
+// flusher pushes new lines to the view at a steady rate. A single ticker
+// for all streams means busy streams flush promptly (a per-line timer only
+// fires after a lull) and the UI gets one batched update per tick.
+func (l *Log) flusher(ctx context.Context) {
+	defer internal.LogPanic("log flusher")
+	d := l.flushTimeout
+	if d <= 0 {
+		d = 50 * time.Millisecond
+	}
+	t := time.NewTicker(d)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			l.Notify()
+		}
+	}
+}
+
 // AddListener adds a new model listener.
 func (l *Log) AddListener(listener LogsListener) {
-	l.mx.Lock()
-	defer l.mx.Unlock()
+	l.lmx.Lock()
+	defer l.lmx.Unlock()
 
-	l.listeners = append(l.listeners, listener)
+	ll := make([]LogsListener, 0, len(l.listeners)+1)
+	ll = append(ll, l.listeners...)
+	l.listeners = append(ll, listener)
 }
 
 // RemoveListener delete a listener from the list.
 func (l *Log) RemoveListener(listener LogsListener) {
-	l.mx.Lock()
-	defer l.mx.Unlock()
+	l.lmx.Lock()
+	defer l.lmx.Unlock()
 
-	victim := -1
-	for i, lis := range l.listeners {
-		if lis == listener {
-			victim = i
-			break
+	ll := make([]LogsListener, 0, len(l.listeners))
+	for _, lis := range l.listeners {
+		if lis != listener {
+			ll = append(ll, lis)
 		}
 	}
-
-	if victim >= 0 {
-		l.listeners = append(l.listeners[:victim], l.listeners[victim+1:]...)
-	}
+	l.listeners = ll
 }
 
-func (l *Log) applyFilter(index int, q string) ([][]byte, error) {
+// snapshotListeners returns the current listeners. Slices are replaced on
+// write, so the returned slice is never mutated.
+func (l *Log) snapshotListeners() []LogsListener {
+	l.lmx.RLock()
+	defer l.lmx.RUnlock()
+
+	return l.listeners
+}
+
+// fireBatch renders/filters a snapshot of log items and notifies listeners.
+func (l *Log) fireBatch(items *dao.LogItems, q string, showTime bool) {
+	var ll [][]byte
 	if q == "" {
-		return nil, nil
-	}
-	matches, indices, err := l.lines.Filter(index, q, l.logOptions.ShowTimestamp)
-	if err != nil {
-		return nil, err
-	}
-
-	// No filter!
-	if matches == nil {
-		ll := make([][]byte, l.lines.Len())
-		l.lines.Render(index, l.logOptions.ShowTimestamp, ll)
-		return ll, nil
-	}
-	// Blank filter
-	if len(matches) == 0 {
-		return nil, nil
-	}
-	filtered := make([][]byte, 0, len(matches))
-	ll := make([][]byte, l.lines.Len())
-	l.lines.Lines(index, l.logOptions.ShowTimestamp, ll)
-	for i, idx := range matches {
-		filtered = append(filtered, color.Highlight(ll[idx], indices[i], 209))
-	}
-
-	return filtered, nil
-}
-
-func (l *Log) fireLogBuffChanged(index int) {
-	ll := make([][]byte, l.lines.Len()-index)
-	if l.filter == "" {
-		l.lines.Render(index, l.logOptions.ShowTimestamp, ll)
+		ll = items.RenderFrom(0, showTime)
 	} else {
-		ff, err := l.applyFilter(index, l.filter)
+		lines, matches, indices, err := items.FilterLines(0, q, showTime)
 		if err != nil {
 			l.fireLogError(err)
 			return
 		}
-		ll = ff
+		ll = highlight(lines, matches, indices)
 	}
-
 	if len(ll) > 0 {
 		l.fireLogChanged(ll)
 	}
 }
 
+func highlight(lines [][]byte, matches []int, indices [][]int) [][]byte {
+	// No filter!
+	if matches == nil {
+		return lines
+	}
+	filtered := make([][]byte, 0, len(matches))
+	for i, idx := range matches {
+		if idx < 0 || idx >= len(lines) {
+			continue
+		}
+		filtered = append(filtered, color.Highlight(lines[idx], indices[i], 209))
+	}
+
+	return filtered
+}
+
+// fireAll clears the listeners and re-sends the whole buffer.
+func (l *Log) fireAll() {
+	l.notifyMx.Lock()
+	defer l.notifyMx.Unlock()
+
+	l.mx.Lock()
+	l.sent = l.total
+	batch := l.lines.Subset(0)
+	q, showTime := l.filter, l.logOptions.ShowTimestamp
+	l.mx.Unlock()
+
+	l.fireLogCleared()
+	l.fireBatch(batch, q, showTime)
+}
+
 func (l *Log) fireLogResume() {
-	for _, lis := range l.listeners {
+	for _, lis := range l.snapshotListeners() {
 		lis.LogResume()
 	}
 }
 
 func (l *Log) fireCanceled() {
-	for _, lis := range l.listeners {
+	for _, lis := range l.snapshotListeners() {
 		lis.LogCanceled()
 	}
 }
 
 func (l *Log) fireLogError(err error) {
-	for _, lis := range l.listeners {
+	for _, lis := range l.snapshotListeners() {
 		lis.LogFailed(err)
 	}
 }
 
 func (l *Log) fireLogChanged(lines [][]byte) {
-	for _, lis := range l.listeners {
+	for _, lis := range l.snapshotListeners() {
 		lis.LogChanged(lines)
 	}
 }
 
 func (l *Log) fireLogCleared() {
-	var ll []LogsListener
-	l.mx.RLock()
-	ll = l.listeners
-	l.mx.RUnlock()
-	for _, lis := range ll {
+	for _, lis := range l.snapshotListeners() {
 		lis.LogCleared()
 	}
 }

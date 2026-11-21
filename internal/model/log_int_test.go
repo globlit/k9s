@@ -6,6 +6,8 @@ package model
 import (
 	"context"
 	"strconv"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,8 +32,12 @@ func TestUpdateLogs(t *testing.T) {
 	for i := range 2 * size {
 		c <- dao.NewLogItemFromString("line" + strconv.Itoa(i))
 	}
-	time.Sleep(2 * time.Second)
-	assert.Equal(t, size, v.count)
+	// Every flush delivers new lines promptly: at least a full buffer's worth
+	// reaches the view and the very last line is never lost.
+	assert.Eventually(t, func() bool {
+		return strings.Contains(v.getLast(), "line"+strconv.Itoa(2*size-1))
+	}, 2*time.Second, 10*time.Millisecond)
+	assert.GreaterOrEqual(t, v.getCount(), size)
 }
 
 func BenchmarkUpdateLogs(b *testing.B) {
@@ -67,7 +73,23 @@ func makeLogOpts(count int) *dao.LogOptions {
 }
 
 type mockLogView struct {
+	mx    sync.Mutex
 	count int
+	last  string
+}
+
+func (t *mockLogView) getLast() string {
+	t.mx.Lock()
+	defer t.mx.Unlock()
+
+	return t.last
+}
+
+func (t *mockLogView) getCount() int {
+	t.mx.Lock()
+	defer t.mx.Unlock()
+
+	return t.count
 }
 
 func newMockLogView() *mockLogView {
@@ -75,10 +97,39 @@ func newMockLogView() *mockLogView {
 }
 
 func (t *mockLogView) LogChanged(ll [][]byte) {
+	t.mx.Lock()
+	defer t.mx.Unlock()
 	t.count += len(ll)
+	if len(ll) > 0 {
+		t.last = string(ll[len(ll)-1])
+	}
 }
 func (*mockLogView) LogStop()        {}
 func (*mockLogView) LogCanceled()    {}
 func (*mockLogView) LogResume()      {}
 func (*mockLogView) LogCleared()     {}
 func (*mockLogView) LogFailed(error) {}
+
+// A chatty stream that never pauses for flushTimeout must still reach the
+// view while it is flowing (it used to only flush after a lull).
+func TestUpdateLogsSteadyStreamFlushes(t *testing.T) {
+	m := NewLog(client.NewGVR("fred"), makeLogOpts(1000), 50*time.Millisecond)
+	m.Init(makeFactory())
+	v := newMockLogView()
+	m.AddListener(v)
+
+	c := make(dao.LogChan, 10)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go m.updateLogs(ctx, c)
+
+	deadline := time.Now().Add(400 * time.Millisecond)
+	var i int
+	for time.Now().Before(deadline) {
+		c <- dao.NewLogItemFromString("line" + strconv.Itoa(i))
+		i++
+		time.Sleep(5 * time.Millisecond)
+	}
+	// Still streaming: lines must have been flushed already.
+	assert.Positive(t, v.getCount())
+}

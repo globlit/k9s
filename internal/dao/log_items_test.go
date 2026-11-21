@@ -143,3 +143,15 @@ func TestLogItemsRender(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkLogItemsFilter(b *testing.B) {
+	ii := dao.NewLogItems()
+	for i := range 5_000 {
+		ii.Add(dao.NewLogItemFromString(fmt.Sprintf("2024-01-01T00:00:00Z level=info pod=web-%d msg=request served status=%d", i%20, 200+i%5)))
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		_, _, _ = ii.Filter(0, "status=203", false)
+	}
+}

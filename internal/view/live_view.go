@@ -103,9 +103,12 @@ func (v *LiveView) InCmdMode() bool {
 
 // ResourceFailed notifies when there is an issue.
 func (v *LiveView) ResourceFailed(err error) {
-	v.text.SetTextAlign(tview.AlignCenter)
-	x, _, w, _ := v.GetRect()
-	v.text.SetText(cowTalk(err.Error(), x+w))
+	// Called from the model updater goroutine.
+	v.app.QueueUpdateDraw(func() {
+		v.text.SetTextAlign(tview.AlignCenter)
+		x, _, w, _ := v.GetRect()
+		v.text.SetText(cowTalk(err.Error(), x+w))
+	})
 }
 
 // ResourceChanged notifies when the filter changes.

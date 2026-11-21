@@ -32,6 +32,8 @@ type LogItems struct {
 	items     []*LogItem
 	podColors podColors
 	mx        sync.RWMutex
+	// colorMx guards podColors so renders can run under a read lock.
+	colorMx sync.Mutex
 }
 
 // NewLogItems returns a new instance.
@@ -63,9 +65,11 @@ func (l *LogItems) Clear() {
 	defer l.mx.Unlock()
 
 	l.items = l.items[:0]
+	l.colorMx.Lock()
 	for k := range l.podColors {
 		delete(l.podColors, k)
 	}
+	l.colorMx.Unlock()
 }
 
 // Shift scrolls the lines by one.
@@ -81,21 +85,39 @@ func (l *LogItems) Subset(index int) *LogItems {
 	l.mx.RLock()
 	defer l.mx.RUnlock()
 
+	l.colorMx.Lock()
+	cc := make(podColors, len(l.podColors))
+	for k, v := range l.podColors {
+		cc[k] = v
+	}
+	l.colorMx.Unlock()
+
 	return &LogItems{
-		items:     l.items[index:],
-		podColors: l.podColors,
+		items:     append([]*LogItem(nil), l.items[index:]...),
+		podColors: cc,
 	}
 }
 
 // Merge merges two logitems list.
 func (l *LogItems) Merge(n *LogItems) {
+	n.mx.RLock()
+	items := append([]*LogItem(nil), n.items...)
+	n.mx.RUnlock()
+	n.colorMx.Lock()
+	cc := make(podColors, len(n.podColors))
+	for k, v := range n.podColors {
+		cc[k] = v
+	}
+	n.colorMx.Unlock()
+
 	l.mx.Lock()
 	defer l.mx.Unlock()
-
-	l.items = append(l.items, n.items...)
-	for k, v := range n.podColors {
+	l.items = append(l.items, items...)
+	l.colorMx.Lock()
+	for k, v := range cc {
 		l.podColors[k] = v
 	}
+	l.colorMx.Unlock()
 }
 
 // Add augments the items.
@@ -107,53 +129,78 @@ func (l *LogItems) Add(ii ...*LogItem) {
 }
 
 func (l *LogItems) podColorFor(id string) string {
-	color, ok := l.podColors[id]
-	if ok {
+	l.colorMx.Lock()
+	defer l.colorMx.Unlock()
+
+	if color, ok := l.podColors[id]; ok {
 		return color
 	}
 	var idx int
 	for i, r := range id {
 		idx += i * int(r)
 	}
-	l.podColors[id] = podPalette[idx%len(podPalette)]
+	color := podPalette[idx%len(podPalette)]
+	l.podColors[id] = color
 
-	return l.podColors[id]
+	return color
 }
 
-// Lines returns a collection of log lines.
-func (l *LogItems) Lines(index int, showTime bool, ll [][]byte) {
-	l.mx.Lock()
-	defer l.mx.Unlock()
-
+// renderLocked renders items from index into ll. Caller must hold l.mx.
+// At most len(ll) lines are rendered.
+func (l *LogItems) renderLocked(index int, showTime bool, ll [][]byte) {
+	if index < 0 || index > len(l.items) {
+		return
+	}
 	for i, item := range l.items[index:] {
+		if i >= len(ll) {
+			return
+		}
 		bb := bytes.NewBuffer(make([]byte, 0, item.Size()))
 		item.Render(l.podColorFor(item.ID()), showTime, bb)
 		ll[i] = bb.Bytes()
 	}
 }
 
-// StrLines returns a collection of log lines.
-func (l *LogItems) StrLines(index int, showTime bool) []string {
-	l.mx.Lock()
-	defer l.mx.Unlock()
+// RenderFrom renders all lines starting at index. The result is sized
+// under the same lock as the render so it cannot race with concurrent appends.
+func (l *LogItems) RenderFrom(index int, showTime bool) [][]byte {
+	l.mx.RLock()
+	defer l.mx.RUnlock()
 
-	ll := make([]string, len(l.items[index:]))
-	for i, item := range l.items[index:] {
-		bb := bytes.NewBuffer(make([]byte, 0, item.Size()))
-		item.Render(l.podColorFor(item.ID()), showTime, bb)
-		ll[i] = bb.String()
+	if index < 0 || index > len(l.items) {
+		return nil
 	}
+	ll := make([][]byte, len(l.items)-index)
+	l.renderLocked(index, showTime, ll)
 
 	return ll
 }
 
+// Lines returns a collection of log lines.
+func (l *LogItems) Lines(index int, showTime bool, ll [][]byte) {
+	l.mx.RLock()
+	defer l.mx.RUnlock()
+
+	l.renderLocked(index, showTime, ll)
+}
+
+// StrLines returns a collection of log lines.
+func (l *LogItems) StrLines(index int, showTime bool) []string {
+	ll := l.RenderFrom(index, showTime)
+	ss := make([]string, len(ll))
+	for i, b := range ll {
+		ss[i] = string(b)
+	}
+
+	return ss
+}
+
 // Render returns logs as a collection of strings.
 func (l *LogItems) Render(index int, showTime bool, ll [][]byte) {
-	for i, item := range l.items[index:] {
-		bb := bytes.NewBuffer(make([]byte, 0, item.Size()))
-		item.Render(l.podColorFor(item.ID()), showTime, bb)
-		ll[i] = bb.Bytes()
-	}
+	l.mx.RLock()
+	defer l.mx.RUnlock()
+
+	l.renderLocked(index, showTime, ll)
 }
 
 // DumpDebug for debugging.
@@ -166,26 +213,35 @@ func (l *LogItems) DumpDebug(m string) {
 
 // Filter filters out log items based on given filter.
 func (l *LogItems) Filter(index int, q string, showTime bool) (matches []int, indices [][]int, err error) {
+	_, matches, indices, err = l.FilterLines(index, q, showTime)
+
+	return
+}
+
+// FilterLines filters log items from index and returns the rendered lines the
+// matches refer to, so callers never index into a buffer that moved meanwhile.
+func (l *LogItems) FilterLines(index int, q string, showTime bool) (lines [][]byte, matches []int, indices [][]int, err error) {
 	if q == "" {
 		return
 	}
+	lines = l.RenderFrom(index, showTime)
 	if f, ok := internal.IsFuzzySelector(q); ok {
-		matches, indices = l.fuzzyFilter(index, f, showTime)
+		matches, indices = fuzzyFilter(lines, f)
 		return
 	}
-	matches, indices, err = l.filterLogs(index, q, showTime)
-	if err != nil {
-		return
-	}
+	matches, indices, err = filterLogs(lines, q)
 
-	return matches, indices, nil
+	return
 }
 
-func (l *LogItems) fuzzyFilter(index int, q string, showTime bool) (matches []int, indices [][]int) {
+func fuzzyFilter(lines [][]byte, q string) (matches []int, indices [][]int) {
 	q = strings.TrimSpace(q)
-	matches, indices = make([]int, 0, len(l.items)), make([][]int, 0, len(l.items))
-	mm := fuzzy.Find(q, l.StrLines(index, showTime))
-	for _, m := range mm {
+	ss := make([]string, len(lines))
+	for i, b := range lines {
+		ss[i] = string(b)
+	}
+	matches, indices = make([]int, 0, len(lines)), make([][]int, 0, len(lines))
+	for _, m := range fuzzy.Find(q, ss) {
 		matches = append(matches, m.Index)
 		indices = append(indices, m.MatchedIndexes)
 	}
@@ -193,20 +249,19 @@ func (l *LogItems) fuzzyFilter(index int, q string, showTime bool) (matches []in
 	return matches, indices
 }
 
-func (l *LogItems) filterLogs(index int, q string, showTime bool) (matches []int, indices [][]int, err error) {
+func filterLogs(lines [][]byte, q string) (matches []int, indices [][]int, err error) {
 	var invert bool
 	if internal.IsInverseSelector(q) {
 		invert = true
 		q = q[1:]
 	}
-	rx, err := regexp.Compile(`(?i)` + q)
-	if err != nil {
+	rx, ok := internal.CompileFilterRx(q)
+	if !ok {
+		_, err = regexp.Compile(`(?i)` + q)
 		return nil, nil, err
 	}
-	matches, indices = make([]int, 0, len(l.items)), make([][]int, 0, len(l.items))
-	ll := make([][]byte, len(l.items[index:]))
-	l.Lines(index, showTime, ll)
-	for i, line := range ll {
+	matches, indices = make([]int, 0, len(lines)), make([][]int, 0, len(lines))
+	for i, line := range lines {
 		locs := rx.FindAllIndex(line, -1)
 		if locs != nil && invert {
 			continue

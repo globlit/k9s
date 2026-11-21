@@ -98,26 +98,29 @@ func (d *Details) InCmdMode() bool {
 
 // TextChanged notifies the model changed.
 func (d *Details) TextChanged(lines []string) {
-	switch d.contentType {
-	case contentYAML:
-		d.text.SetText(colorizeYAML(d.app.Styles.Views().Yaml, strings.Join(lines, "\n")))
-	default:
-		d.text.SetText(strings.Join(lines, "\n"))
-	}
-	d.text.ScrollToBeginning()
+	d.app.QueueUpdateDraw(func() {
+		switch d.contentType {
+		case contentYAML:
+			d.text.SetText(colorizeYAML(d.app.Styles.Views().Yaml, strings.Join(lines, "\n")))
+		default:
+			d.text.SetText(strings.Join(lines, "\n"))
+		}
+		d.text.ScrollToBeginning()
+	})
 }
 
 // TextFiltered notifies when the filter changed.
 func (d *Details) TextFiltered(lines []string, matches fuzzy.Matches) {
-	d.currentRegion, d.maxRegions = 0, len(matches)
 	ll := linesWithRegions(lines, matches)
-
-	d.text.SetText(colorizeYAML(d.app.Styles.Views().Yaml, strings.Join(ll, "\n")))
-	d.text.Highlight()
-	if len(matches) > 0 {
-		d.text.Highlight("search_0")
-		d.text.ScrollToHighlight()
-	}
+	d.app.QueueUpdateDraw(func() {
+		d.currentRegion, d.maxRegions = 0, len(matches)
+		d.text.SetText(colorizeYAML(d.app.Styles.Views().Yaml, strings.Join(ll, "\n")))
+		d.text.Highlight()
+		if len(matches) > 0 {
+			d.text.Highlight("search_0")
+			d.text.ScrollToHighlight()
+		}
+	})
 }
 
 // BufferChanged indicates the buffer was changed.
@@ -125,8 +128,9 @@ func (*Details) BufferChanged(_, _ string) {}
 
 // BufferCompleted indicates input was accepted.
 func (d *Details) BufferCompleted(text, _ string) {
+	// Called from the command buffer's debounce goroutine.
 	d.model.Filter(text)
-	d.updateTitle()
+	d.app.QueueUpdateDraw(d.updateTitle)
 }
 
 // BufferActive indicates the buff activity changed.
