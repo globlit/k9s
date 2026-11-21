@@ -7,6 +7,7 @@ import (
 	"maps"
 	"strings"
 	"testing"
+	"unicode"
 )
 
 var interpreterSeeds = []string{
@@ -127,9 +128,12 @@ func FuzzInterpreterMerge(f *testing.F) {
 			return
 		}
 		want := setArgs(p.args)
-		// Skip values with a stray quote: only malformed quotes make them.
-		for _, v := range want {
-			if strings.Contains(v, "'") {
+		// Skip what one line cannot hold: a stray quote, a namespace that
+		// looks like a flag, or a second quoted value next to the labels.
+		_, lbl := want[labelKey]
+		for k, v := range want {
+			if strings.Contains(v, "'") || (k == nsKey && strings.ContainsAny(v[:1], "-/@")) ||
+				(lbl && k != labelKey && strings.ContainsFunc(v, unicode.IsSpace)) {
 				return
 			}
 		}
