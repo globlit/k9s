@@ -9,9 +9,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync/atomic"
-	"time"
 
-	backoff "github.com/cenkalti/backoff/v4"
 	"github.com/derailed/k9s/internal"
 	"github.com/derailed/k9s/internal/client"
 	"github.com/derailed/k9s/internal/dao"
@@ -126,36 +124,13 @@ func (v *RevValues) Refresh(ctx context.Context) error {
 
 // Watch watches for Values changes.
 func (v *RevValues) Watch(ctx context.Context) error {
+	// Values are fetched once (and again on toggle/refresh): polling would
+	// only redraw identical content and reset the search position.
 	if err := v.refresh(ctx); err != nil {
 		return err
 	}
-	go v.updater(ctx)
 
 	return nil
-}
-
-func (v *RevValues) updater(ctx context.Context) {
-	defer slog.Debug("YAML canceled", slogs.GVR, v.gvr)
-
-	backOff := NewExpBackOff(ctx, defaultReaderRefreshRate, maxReaderRetryInterval)
-	delay := defaultReaderRefreshRate
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(delay):
-			if err := v.refresh(ctx); err != nil {
-				v.fireResourceFailed(err)
-				if delay = backOff.NextBackOff(); delay == backoff.Stop {
-					slog.Error("Giving up retrieving chart values", slogs.Error, err)
-					return
-				}
-			} else {
-				backOff.Reset()
-				delay = defaultReaderRefreshRate
-			}
-		}
-	}
 }
 
 func (v *RevValues) refresh(context.Context) error {

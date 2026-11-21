@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/derailed/k9s/internal/model1"
@@ -113,18 +114,12 @@ func (cc ColumnSpecs) realize(o runtime.Object, rh model1.Header, row *model1.Ro
 	parsers := make([]*jsonpath.JSONPath, len(cc))
 	for ix := range cc {
 		if cc[ix].Spec == "" {
-			parsers[ix] = nil
 			continue
 		}
-		parsers[ix] = jsonpath.New(
-			fmt.Sprintf("column%d", ix),
-		).AllowMissingKeys(true)
-		if err := parsers[ix].Parse(cc[ix].Spec); err != nil && !isJQSpec(cc[ix].Spec) {
-			slog.Warn("Unable to parse custom column",
-				slogs.Name, cc[ix].Header.Name,
-				slogs.Error, err,
-			)
-		}
+		cs := compileSpec(cc[ix].Header.Name, cc[ix].Spec)
+		jp := cs.jps.Get().(*jsonpath.JSONPath)
+		defer cs.jps.Put(jp)
+		parsers[ix] = jp
 	}
 
 	vv, err := hydrate(o, cc, parsers, rh, row)
@@ -158,7 +153,9 @@ func hydrate(o runtime.Object, cc ColumnSpecs, parsers []*jsonpath.JSONPath, rh 
 					Header: spec.Header,
 					Value:  NAValue,
 				}
-				slog.Warn("Unable to find custom column", slogs.Name, spec.Header.Name)
+				if _, warned := missingColWarned.LoadOrStore(spec.Header.Name, struct{}{}); !warned {
+					slog.Warn("Unable to find custom column", slogs.Name, spec.Header.Name)
+				}
 				continue
 			}
 			var v string
@@ -283,16 +280,13 @@ func jqParse(spec string, o map[string]any) (string, bool) {
 	if !isJQSpec(spec) {
 		return "", false
 	}
-
-	exp := spec[1 : len(spec)-1]
-	jq, err := gojq.Parse(exp)
-	if err != nil {
-		slog.Warn("Fail to parse JQ expression", slogs.JQExp, exp, slogs.Error, err)
+	code := compileSpec("", spec).jq
+	if code == nil {
 		return "", false
 	}
 
 	rr := make([]string, 0, 10)
-	iter := jq.Run(o)
+	iter := code.Run(o)
 	for v, ok := iter.Next(); ok; v, ok = iter.Next() {
 		if e, cool := v.(error); cool && e != nil {
 			if errors.Is(e, new(gojq.HaltError)) {
@@ -308,4 +302,53 @@ func jqParse(spec string, o map[string]any) (string, bool) {
 	}
 
 	return strings.Join(rr, ","), true
+}
+
+// compiledSpec holds the parsed forms of a custom column spec. Parsing is
+// expensive and specs are evaluated for every row and column on each
+// refresh, so each spec is parsed once and reused.
+type compiledSpec struct {
+	// jq is safe for concurrent use; nil if the spec is not a valid JQ expression.
+	jq *gojq.Code
+	// jps hands out parsed JSONPath evaluators, which carry evaluation state
+	// and so cannot be shared between goroutines.
+	jps sync.Pool
+}
+
+var (
+	specCache        sync.Map // map[string]*compiledSpec
+	missingColWarned sync.Map // map[string]struct{}: warn once per column, not per row
+)
+
+func compileSpec(name, spec string) *compiledSpec {
+	if v, ok := specCache.Load(spec); ok {
+		return v.(*compiledSpec)
+	}
+
+	cs := new(compiledSpec)
+	jq := isJQSpec(spec)
+	if jq {
+		exp := spec[1 : len(spec)-1]
+		if q, err := gojq.Parse(exp); err != nil {
+			slog.Warn("Fail to parse JQ expression", slogs.JQExp, exp, slogs.Error, err)
+		} else if code, err := gojq.Compile(q); err != nil {
+			slog.Warn("Fail to compile JQ expression", slogs.JQExp, exp, slogs.Error, err)
+		} else {
+			cs.jq = code
+		}
+	}
+	if err := jsonpath.New("column").AllowMissingKeys(true).Parse(spec); err != nil && !jq {
+		slog.Warn("Unable to parse custom column",
+			slogs.Name, name,
+			slogs.Error, err,
+		)
+	}
+	cs.jps.New = func() any {
+		jp := jsonpath.New("column").AllowMissingKeys(true)
+		_ = jp.Parse(spec)
+		return jp
+	}
+
+	v, _ := specCache.LoadOrStore(spec, cs)
+	return v.(*compiledSpec)
 }

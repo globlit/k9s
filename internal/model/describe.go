@@ -18,6 +18,8 @@ import (
 	"github.com/derailed/k9s/internal/dao"
 	"github.com/derailed/k9s/internal/slogs"
 	"github.com/sahilm/fuzzy"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 // Describe tracks describable resources.
@@ -30,7 +32,18 @@ type Describe struct {
 	refreshRate time.Duration
 	listeners   []ResourceViewerListener
 	decode      bool
+
+	// kubectl describe is expensive (REST mapping, events LIST, and for nodes
+	// a LIST of all their pods): only re-run it when the object changed, or
+	// periodically to pick up new events.
+	lastRV       string
+	lastDescribe time.Time
+	force        atomic.Bool
 }
+
+// describeMaxAge bounds how stale events in a describe can get when the
+// object itself does not change.
+const describeMaxAge = 30 * time.Second
 
 // NewDescribe returns a new describe resource model.
 func NewDescribe(gvr *client.GVR, path string) *Describe {
@@ -101,11 +114,13 @@ func (d *Describe) Peek() []string {
 
 // Refresh updates model data.
 func (d *Describe) Refresh(ctx context.Context) error {
+	d.force.Store(true)
 	return d.refresh(ctx)
 }
 
 // Watch watches for describe data changes.
 func (d *Describe) Watch(ctx context.Context) error {
+	d.force.Store(true)
 	if err := d.refresh(ctx); err != nil {
 		return err
 	}
@@ -149,6 +164,8 @@ func (d *Describe) refresh(ctx context.Context) error {
 			slogs.GVR, d.gvr,
 			slogs.Error, err,
 		)
+		// Forget the last output so the next success redraws over the error.
+		d.lines, d.lastRV = nil, ""
 		d.fireResourceFailed(err)
 		return err
 	}
@@ -157,10 +174,15 @@ func (d *Describe) refresh(ctx context.Context) error {
 }
 
 func (d *Describe) reconcile(ctx context.Context) error {
+	rv := d.resourceVersion(ctx)
+	if !d.force.Swap(false) && rv != "" && rv == d.lastRV && time.Since(d.lastDescribe) < describeMaxAge {
+		return nil
+	}
 	s, err := d.describe(ctx, d.gvr, d.path)
 	if err != nil {
 		return err
 	}
+	d.lastRV, d.lastDescribe = rv, time.Now()
 	lines := strings.Split(s, "\n")
 	if reflect.DeepEqual(lines, d.lines) {
 		return nil
@@ -211,4 +233,29 @@ func (d *Describe) RemoveListener(l ResourceViewerListener) {
 // Toggle toggles the decode flag.
 func (d *Describe) Toggle() {
 	d.decode = !d.decode
+	d.force.Store(true)
+}
+
+// resourceVersion returns the cached resource version of the described
+// object, or "" when it is unknown (the describe then always runs).
+func (d *Describe) resourceVersion(ctx context.Context) string {
+	// Only real API resources are informer-backed; asking the factory about
+	// k9s pseudo-resources (helm, containers, ...) would start bogus watches.
+	if m, err := dao.MetaAccess.MetaFor(d.gvr); err != nil || dao.IsK9sMeta(m) || !d.gvr.IsK8sRes() {
+		return ""
+	}
+	f, ok := ctx.Value(internal.KeyFactory).(dao.Factory)
+	if !ok || f == nil {
+		return ""
+	}
+	o, err := f.Get(d.gvr, d.path, false, labels.Everything())
+	if err != nil || o == nil {
+		return ""
+	}
+	m, err := meta.Accessor(o)
+	if err != nil {
+		return ""
+	}
+
+	return m.GetResourceVersion()
 }

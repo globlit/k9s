@@ -96,11 +96,8 @@ func (t *Table) Render(o any, ns string, r *model1.Row) error {
 		return nil
 	}
 
-	obj := row.Object.Object
-	if obj != nil {
-		obj = obj.DeepCopyObject()
-	}
-	cols, err := t.specs.realize(obj, t.defaultHeader(), r)
+	// realize only reads the object: no need to copy it.
+	cols, err := t.specs.realize(row.Object.Object, t.defaultHeader(), r)
 	cols.hydrateRow(r)
 
 	return err

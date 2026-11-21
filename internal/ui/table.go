@@ -476,13 +476,30 @@ func (t *Table) UpdateUI(cdata, data *model1.TableData) {
 
 	pads := make(MaxyPad, cdata.HeaderCount())
 	ComputeMaxColumns(pads, t.getSortCol().Name, cdata)
+	// Everything that is constant across rows is computed once here rather
+	// than per cell: on large clusters this loop runs ~100k times per refresh.
+	h := cdata.Header()
+	rc := rowCtx{
+		h:       h,
+		pads:    pads,
+		ns:      t.GetModel().GetNamespace(),
+		color:   model1.DefaultColorer,
+		exclude: make([]bool, len(h)),
+		mark:    t.styles.Table().MarkColor.Color(),
+	}
+	if t.colorerFn != nil {
+		rc.color = t.colorerFn
+	}
+	for c := range h {
+		rc.exclude[c] = t.shouldExcludeColumn(h[c])
+	}
 	cdata.RowsRange(func(row int, re model1.RowEvent) bool {
 		ore, ok := data.FindRow(re.Row.ID)
 		if !ok {
 			slog.Error("Unable to find original row event", slogs.RowID, re.Row.ID)
 			return true
 		}
-		t.buildRow(row+1, &re, &ore, cdata.Header(), pads)
+		t.buildRow(row+1, &re, &ore, &rc)
 
 		return true
 	})
@@ -491,15 +508,24 @@ func (t *Table) UpdateUI(cdata, data *model1.TableData) {
 	t.UpdateTitle()
 }
 
-func (t *Table) buildRow(r int, re, ore *model1.RowEvent, h model1.Header, pads MaxyPad) {
-	color := model1.DefaultColorer
-	if t.colorerFn != nil {
-		color = t.colorerFn
-	}
+type rowCtx struct {
+	h       model1.Header
+	pads    MaxyPad
+	ns      string
+	color   model1.ColorerFunc
+	exclude []bool
+	mark    tcell.Color
+}
 
-	marked := t.IsMarked(re.Row.ID)
+func (t *Table) buildRow(r int, re, ore *model1.RowEvent, rc *rowCtx) {
+	h := rc.h
+	fgColor := rc.color(rc.ns, h, re)
+	if t.IsMarked(re.Row.ID) {
+		fgColor = rc.mark
+	}
+	blankDeltas := re.Deltas.IsBlank()
+
 	var col int
-	ns := t.GetModel().GetNamespace()
 	for c, field := range re.Row.Fields {
 		if c >= len(h) {
 			slog.Error("Field/header overflow detected. Check your mappings!",
@@ -509,11 +535,11 @@ func (t *Table) buildRow(r int, re, ore *model1.RowEvent, h model1.Header, pads 
 			)
 			continue
 		}
-		if t.shouldExcludeColumn(h[c]) {
+		if rc.exclude[c] {
 			continue
 		}
 
-		if !re.Deltas.IsBlank() && !h.IsTimeCol(c) {
+		if !blankDeltas && !h.IsTimeCol(c) {
 			var old string
 			if c < len(ore.Deltas) {
 				old = ore.Deltas[c]
@@ -528,17 +554,13 @@ func (t *Table) buildRow(r int, re, ore *model1.RowEvent, h model1.Header, pads 
 			field = h[c].Decorator(field)
 		}
 		if h[c].Align == tview.AlignLeft {
-			field = formatCell(field, pads[c])
+			field = formatCell(field, rc.pads[c])
 		}
 
 		cell := tview.NewTableCell(field)
 		cell.SetExpansion(1)
 		cell.SetAlign(h[c].Align)
-		fgColor := color(ns, h, re)
 		cell.SetTextColor(fgColor)
-		if marked {
-			cell.SetTextColor(t.styles.Table().MarkColor.Color())
-		}
 		if col == 0 {
 			cell.SetReference(re.Row.ID)
 		}
