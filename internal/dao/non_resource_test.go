@@ -25,8 +25,6 @@ func TestNonResourceAccessors(t *testing.T) {
 }
 
 func TestNonResourceGVRConcurrentInit(t *testing.T) {
-	t.Skip("bug: NonResource.GVR read-locks mx twice (via gvrStr); a pending Init deadlocks it")
-
 	var n NonResource
 	n.Init(nil, client.PodGVR)
 	done := make(chan struct{})

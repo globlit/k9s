@@ -15,9 +15,11 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/kubernetes/scheme"
 	mxv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	"k8s.io/utils/ptr"
 )
@@ -143,6 +145,42 @@ func TestCRD(t *testing.T) {
 	rl, err := disc.ServerResourcesForGroupVersion("fred.com/v1")
 	require.NoError(t, err)
 	assert.Equal(t, "blees", rl.APIResources[0].Name)
+}
+
+func TestCRDWithExtScheme(t *testing.T) {
+	// Register CRD types in the client-go scheme, as helm does in dao.
+	require.NoError(t, apiextv1.AddToScheme(scheme.Scheme))
+	gvr := client.NewGVR("fred.com/v1/blees")
+	fc := fakecluster.New(t, fakecluster.WithCRD(gvr, "Blee", true))
+
+	dyn, _ := fc.Conn().DynDial()
+	crds, err := dyn.Resource(client.CrdGVR.GVR()).List(context.Background(), metav1.ListOptions{})
+	require.NoError(t, err)
+	require.Len(t, crds.Items, 1)
+	assert.Equal(t, "blees.fred.com", crds.Items[0].GetName())
+}
+
+func TestRBACOnClients(t *testing.T) {
+	fc := fakecluster.New(t,
+		fakecluster.DenyNS("locked"),
+		fakecluster.DenyVerb("delete"),
+		fakecluster.WithObjects(pod("ns1", "p1"), pod("locked", "p2")),
+	)
+	dyn, _ := fc.Conn().DynDial()
+	cs, _ := fc.Conn().Dial()
+	ctx := context.Background()
+
+	l, err := dyn.Resource(client.PodGVR.GVR()).Namespace("ns1").List(ctx, metav1.ListOptions{})
+	require.NoError(t, err)
+	assert.Len(t, l.Items, 1)
+	_, err = dyn.Resource(client.PodGVR.GVR()).Namespace("locked").List(ctx, metav1.ListOptions{})
+	assert.True(t, apierrors.IsForbidden(err), "dyn list: %v", err)
+	_, err = cs.CoreV1().Pods("locked").Get(ctx, "p2", metav1.GetOptions{})
+	assert.True(t, apierrors.IsForbidden(err), "typed get: %v", err)
+	err = cs.CoreV1().Pods("ns1").Delete(ctx, "p1", metav1.DeleteOptions{})
+	assert.True(t, apierrors.IsForbidden(err), "typed delete: %v", err)
+	_, err = fc.DynGet(client.PodGVR, "ns1", "p1")
+	require.NoError(t, err)
 }
 
 func TestRBAC(t *testing.T) {

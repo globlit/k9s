@@ -41,12 +41,8 @@ func NewRevValues(gvr *client.GVR, path, rev string) *RevValues {
 	}
 }
 
-func getHelmHistDao() *dao.HelmHistory {
-	return Registry[client.HmhGVR].DAO.(*dao.HelmHistory)
-}
-
-func getRevValues(path, _ string) []string {
-	vals, err := getHelmHistDao().GetValues(path, true)
+func getRevValues(path, rev string) []string {
+	vals, err := Registry[client.HmhGVR].DAO.(dao.Valuer).GetValues(path+":"+rev, true)
 	if err != nil {
 		slog.Error("Failed to get Helm values", slogs.Error, err)
 	}

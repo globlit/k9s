@@ -13,6 +13,7 @@ import (
 	"github.com/globlit/k9s/internal/dao"
 	"github.com/globlit/k9s/internal/render"
 	v1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -112,10 +113,10 @@ func (*Pod) serviceAccountRef(ctx context.Context, f dao.Factory, parent *TreeNo
 
 	fqn := client.FQN(ns, spec.ServiceAccountName)
 	o, err := f.Get(client.SaGVR, fqn, true, labels.Everything())
-	if err != nil {
+	if err != nil && !kerrors.IsNotFound(err) {
 		return err
 	}
-	if o == nil {
+	if err != nil || o == nil {
 		addRef(f, parent, client.SaGVR, fqn, nil)
 		return nil
 	}

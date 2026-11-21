@@ -211,8 +211,6 @@ func TestXrayDeploymentNoPods(t *testing.T) {
 }
 
 func TestXrayPodMissingServiceAccount(t *testing.T) {
-	t.Skip("bug: a missing service account fails the whole xray render; the real factory returns NotFound, not nil")
-
 	ctx, f := newXrayCtx(t, xpod("p1", "sa-gone"))
 	root := xray.NewTreeNode(client.PodGVR, "pods")
 	ctx = context.WithValue(ctx, xray.KeyParent, root)
