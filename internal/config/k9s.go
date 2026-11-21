@@ -177,7 +177,9 @@ func (k *K9s) Merge(k1 *K9s) {
 	k.UI = k1.UI
 	k.SkipLatestRevCheck = k1.SkipLatestRevCheck
 	k.DisablePodCounting = k1.DisablePodCounting
-	k.ShellPod = k1.ShellPod
+	if k1.ShellPod != nil {
+		k.ShellPod = k1.ShellPod
+	}
 	k.Logger = k1.Logger
 	k.ImageScans = k1.ImageScans
 	if k1.Thresholds != nil {

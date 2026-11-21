@@ -279,7 +279,6 @@ func TestK9sConfigNoShellPod(t *testing.T) {
 	out := filepath.Join(dir, "out.yaml")
 	require.NoError(t, cfg.SaveFile(out))
 
-	t.Skip("bug: Merge sets ShellPod to nil and SaveFile writes 'shellPod: null', which Load rejects")
 	require.NotNil(t, cfg.K9s.ShellPod)
 	require.NoError(t, config.NewConfig(nil).Load(out, true))
 }
