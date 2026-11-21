@@ -5,6 +5,7 @@ package dialog
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -21,7 +22,9 @@ func TestShowPrompt(t *testing.T) {
 		p := ui.NewPages()
 		a.SetRoot(p, false)
 
-		ShowPrompt(new(config.Dialog), p, "Running", "Pod", func(context.Context) {
+		var mu sync.Mutex
+		queue := func(f func()) { mu.Lock(); defer mu.Unlock(); f() }
+		ShowPrompt(new(config.Dialog), p, queue, "Running", "Pod", func(context.Context) {
 			time.Sleep(time.Millisecond)
 		}, func() {
 			t.Errorf("unexpected cancellations")
@@ -33,7 +36,11 @@ func TestShowPrompt(t *testing.T) {
 		p := ui.NewPages()
 		a.SetRoot(p, false)
 
-		go ShowPrompt(new(config.Dialog), p, "Running", "Pod", func(ctx context.Context) {
+		var mu sync.Mutex
+		queue := func(f func()) { mu.Lock(); defer mu.Unlock(); f() }
+		done := make(chan struct{})
+		ShowPrompt(new(config.Dialog), p, queue, "Running", "Pod", func(ctx context.Context) {
+			defer close(done)
 			select {
 			case <-time.After(time.Second):
 				t.Errorf("expected cancellations")
@@ -42,9 +49,17 @@ func TestShowPrompt(t *testing.T) {
 		}, func() {})
 
 		time.Sleep(time.Second / 2)
-		d := p.GetPrimitive(dialogKey).(*tview.ModalForm)
-		if assert.NotNil(t, d) {
-			d.InputHandler()(tcell.NewEventKey(tcell.KeyEnter, '\n', 0), func(tview.Primitive) {})
-		}
+		queue(func() {
+			d := p.GetPrimitive(dialogKey).(*tview.ModalForm)
+			if assert.NotNil(t, d) {
+				// Hand out focus like tview.Application does so key events
+				// reach the form's Cancel button.
+				var setFocus func(tview.Primitive)
+				setFocus = func(p tview.Primitive) { p.Focus(setFocus) }
+				d.Focus(setFocus)
+				d.InputHandler()(tcell.NewEventKey(tcell.KeyEnter, '\n', 0), setFocus)
+			}
+		})
+		<-done
 	})
 }

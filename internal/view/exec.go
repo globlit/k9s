@@ -8,12 +8,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"os/exec"
 	"os/signal"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -22,6 +22,7 @@ import (
 	"github.com/derailed/k9s/internal/model"
 	"github.com/derailed/k9s/internal/render"
 	"github.com/derailed/k9s/internal/slogs"
+	"github.com/derailed/k9s/internal/ui"
 	"github.com/derailed/k9s/internal/ui/dialog"
 	"github.com/fatih/color"
 	"github.com/google/shlex"
@@ -39,6 +40,7 @@ const (
 	winShellCheck = `where powershell >nul 2>&1 && powershell || cmd`
 	bannerFmt     = "<<K9s-Shell>> Pod: %s | Container: %s \n"
 	outputPrefix  = "[output]"
+	failedPrefix  = "[failed]"
 )
 
 var editorEnvVars = []string{"K9S_EDITOR", "KUBE_EDITOR", "EDITOR"}
@@ -67,9 +69,7 @@ func runK(a *App, opts *shellOpts) error {
 	if u, err := a.Conn().Config().ImpersonateUser(); err == nil {
 		args = append(args, "--as", u)
 	}
-	if g, err := a.Conn().Config().ImpersonateGroups(); err == nil {
-		args = append(args, "--as-group", g)
-	}
+	args = append(args, impersonateGroupArgs(a)...)
 	if isInsecure := a.Conn().Config().Flags().Insecure; isInsecure != nil && *isInsecure {
 		args = append(args, "--insecure-skip-tls-verify")
 	}
@@ -86,10 +86,14 @@ func runK(a *App, opts *shellOpts) error {
 	if !suspended {
 		return fmt.Errorf("unable to run command")
 	}
+	var errs error
 	for v := range stChan {
+		if msg, ok := strings.CutPrefix(v, failedPrefix); ok {
+			errs = errors.Join(errs, errors.New(strings.TrimSpace(msg)))
+			continue
+		}
 		slog.Debug("stdout", slogs.Line, v)
 	}
-	var errs error
 	for e := range errChan {
 		errs = errors.Join(errs, e)
 	}
@@ -113,13 +117,26 @@ func run(a *App, opts *shellOpts) (ok bool, errC chan error, outC chan string) {
 	a.Halt()
 	defer a.Resume()
 
-	return a.Suspend(func() {
+	ran := false
+	ok = a.Suspend(func() {
+		ran = true
+		// The child owns the terminal now: let stderr through.
+		ui.SetStderrCaptured(false)
+		defer ui.SetStderrCaptured(true)
 		if err := execute(opts, statusChan); err != nil {
 			errChan <- err
 			a.Flash().Errf("Exec failed %q: %s", opts, err)
 		}
 		close(errChan)
-	}), errChan, statusChan
+	})
+	if !ran {
+		// The command never ran: close the channels so callers ranging over
+		// them don't block the UI forever.
+		close(errChan)
+		close(statusChan)
+	}
+
+	return ok, errChan, statusChan
 }
 
 func edit(a *App, opts *shellOpts) bool {
@@ -185,6 +202,8 @@ func execute(opts *shellOpts, statusChan chan<- string) error {
 		clearScreen()
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	// Background commands outlive this call, so they release the context
+	// themselves once the command completes (see pipe).
 	defer func() {
 		if !opts.background {
 			cancel()
@@ -192,20 +211,24 @@ func execute(opts *shellOpts, statusChan chan<- string) error {
 		}
 	}()
 
-	var interrupted bool
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-	go func(cancel context.CancelFunc) {
-		defer slog.Debug("Got signal canceled")
-		select {
-		case sig := <-sigChan:
-			slog.Debug("Command canceled with signal", slogs.Sig, sig)
-			cancel()
-		case <-ctx.Done():
-			slog.Debug("Signal context canceled!")
-		}
-		interrupted = true
-	}(cancel)
+	var interrupted atomic.Bool
+	if !opts.background {
+		// Only foreground commands own the terminal and should react to
+		// Ctrl-C. The handler is always unregistered so k9s regains its
+		// default signal handling once the command returns.
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+		defer signal.Stop(sigChan)
+		go func() {
+			select {
+			case sig := <-sigChan:
+				slog.Debug("Command canceled with signal", slogs.Sig, sig)
+				interrupted.Store(true)
+				cancel()
+			case <-ctx.Done():
+			}
+		}()
+	}
 
 	cmds := make([]*exec.Cmd, 0, 1)
 	cmd := exec.CommandContext(ctx, opts.binary, opts.args...)
@@ -231,7 +254,8 @@ func execute(opts *shellOpts, statusChan chan<- string) error {
 
 	for _, p := range opts.pipes {
 		tokens, err := shlex.Split(p)
-		if err != nil || len(tokens) < 2 {
+		if err != nil || len(tokens) == 0 {
+			slog.Warn("Skipping invalid pipe command", slogs.Command, p, slogs.Error, err)
 			continue
 		}
 		cmd := exec.CommandContext(ctx, tokens[0], tokens[1:]...)
@@ -240,8 +264,8 @@ func execute(opts *shellOpts, statusChan chan<- string) error {
 	}
 
 	var o, e bytes.Buffer
-	err := pipe(ctx, opts, statusChan, &o, &e, cmds...)
-	if err != nil && !interrupted {
+	err := pipe(ctx, cancel, opts, statusChan, &o, &e, cmds...)
+	if err != nil && !interrupted.Load() {
 		slog.Error("Pipe Exec failed",
 			slogs.Error, err,
 			slogs.Command, cmds,
@@ -266,9 +290,7 @@ func runKu(ctx context.Context, a *App, opts *shellOpts) (string, error) {
 	if u, err := a.Conn().Config().ImpersonateUser(); err == nil {
 		args = append(args, "--as", u)
 	}
-	if g, err := a.Conn().Config().ImpersonateGroups(); err == nil {
-		args = append(args, "--as-group", g)
-	}
+	args = append(args, impersonateGroupArgs(a)...)
 	args = append(args, "--context", a.Config.K9s.ActiveContextName())
 	if cfg := a.Conn().Config().Flags().KubeConfig; cfg != nil && *cfg != "" {
 		args = append(args, "--kubeconfig", *cfg)
@@ -295,6 +317,10 @@ func oneShoot(ctx context.Context, opts *shellOpts) (string, error) {
 	var err error
 	buff := bytes.NewBufferString("")
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, buff, buff
+	if !opts.clear {
+		// The TUI still owns the terminal: don't let the child read keys.
+		cmd.Stdin = nil
+	}
 	_, _ = cmd.Stdout.Write([]byte(opts.banner))
 	err = cmd.Run()
 
@@ -319,7 +345,7 @@ func launchNodeShell(v model.Igniter, a *App, node string) {
 
 	msg := fmt.Sprintf("Launching node shell on %s...", node)
 	d := a.Styles.Dialog()
-	dialog.ShowPrompt(&d, a.Content.Pages, "Launching", msg, func(ctx context.Context) {
+	dialog.ShowPrompt(&d, a.Content.Pages, a.QueueUpdateDraw, "Launching", msg, func(ctx context.Context) {
 		err := launchShellPod(ctx, a, node)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
@@ -371,10 +397,9 @@ func sshIn(a *App, fqn, co string) error {
 	if len(cfg.Command) > 0 {
 		args = append(args, cfg.Command...)
 		args = append(args, cfg.Args...)
+	} else if platform == windowsOS {
+		args = append(args, "cmd", "/c", winShellCheck)
 	} else {
-		if platform == windowsOS {
-			args = append(args, "--", "cmd", "/c", winShellCheck)
-		}
 		args = append(args, "sh", "-c", shellCheck)
 	}
 	slog.Debug("Running command with args", slogs.Args, args)
@@ -402,7 +427,9 @@ func nukeK9sShell(a *App) error {
 	}
 
 	ns := a.Config.K9s.ShellPod.Namespace
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	// The shell pod is privileged and mounts the node's root: give the delete
+	// a real chance to succeed on slow links instead of leaking it.
+	ctx, cancel := context.WithTimeout(context.Background(), nodeShellDeleteTimeout)
 	defer cancel()
 
 	dial, err := a.Conn().Dial()
@@ -418,7 +445,9 @@ func nukeK9sShell(a *App) error {
 	return err
 }
 
-func launchShellPod(ctx context.Context, a *App, node string) error {
+const nodeShellDeleteTimeout = 10 * time.Second
+
+func launchShellPod(ctx context.Context, a *App, node string) (err error) {
 	var (
 		spo  = a.Config.K9s.ShellPod
 		spec = k9sShellPod(node, spo)
@@ -433,6 +462,14 @@ func launchShellPod(ctx context.Context, a *App, node string) error {
 	if _, err = conn.Create(ctx, spec, metav1.CreateOptions{}); err != nil {
 		return err
 	}
+	// Never leave a privileged pod behind when the shell can't start.
+	defer func() {
+		if err != nil {
+			if e := nukeK9sShell(a); e != nil {
+				slog.Error("Node shell pod cleanup failed", slogs.Error, e)
+			}
+		}
+	}()
 
 	for i := range k9sShellRetryCount {
 		o, err := a.factory.Get(client.PodGVR, client.FQN(spo.Namespace, k9sShellPodName()), true, labels.Everything())
@@ -456,6 +493,9 @@ func launchShellPod(ctx context.Context, a *App, node string) error {
 		if pod.Status.Phase == v1.PodRunning {
 			return nil
 		}
+		if reason, failed := shellPodFailed(&pod); failed {
+			return fmt.Errorf("shell pod on node %s failed to start: %s", node, reason)
+		}
 
 		select {
 		case <-ctx.Done():
@@ -465,6 +505,25 @@ func launchShellPod(ctx context.Context, a *App, node string) error {
 	}
 
 	return fmt.Errorf("unable to launch shell pod on node %s", node)
+}
+
+// shellPodFailed reports pod states that will never become Running, so the
+// user gets the reason right away instead of after the full retry window.
+func shellPodFailed(pod *v1.Pod) (string, bool) {
+	switch pod.Status.Phase {
+	case v1.PodFailed, v1.PodSucceeded:
+		return string(pod.Status.Phase), true
+	}
+	for _, cs := range pod.Status.ContainerStatuses {
+		if w := cs.State.Waiting; w != nil {
+			switch w.Reason {
+			case "ImagePullBackOff", "InvalidImageName", "CreateContainerConfigError":
+				return w.Reason + ": " + w.Message, true
+			}
+		}
+	}
+
+	return "", false
 }
 
 func k9sShellPodName() string {
@@ -560,32 +619,44 @@ func asResource(r config.Limits) v1.ResourceRequirements {
 	}
 }
 
-func pipe(_ context.Context, opts *shellOpts, statusChan chan<- string, w, e *bytes.Buffer, cmds ...*exec.Cmd) error {
+// pipe runs cmds, chaining their stdout/stdin. statusChan is always closed
+// once the command(s) complete so callers ranging over it never block forever.
+// For background commands, done is called once the command terminates.
+func pipe(_ context.Context, done context.CancelFunc, opts *shellOpts, statusChan chan<- string, w, e *bytes.Buffer, cmds ...*exec.Cmd) error {
 	if len(cmds) == 0 {
+		close(statusChan)
 		return nil
 	}
 
 	if len(cmds) == 1 {
 		cmd := cmds[0]
 		if opts.background {
+			// Background commands must not read the terminal tview owns.
+			cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, w, e
 			go func() {
-				cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, w, e
+				defer done()
+				defer close(statusChan)
 				if err := cmd.Run(); err != nil {
-					slog.Error("Command exec failed", slogs.Error, err)
-				} else {
-					for _, l := range strings.Split(w.String(), "\n") {
-						if l != "" {
-							statusChan <- fmt.Sprintf("%s %s", outputPrefix, l)
-						}
-					}
-					statusChan <- fmt.Sprintf("Command completed successfully: %q", render.Truncate(cmd.String(), 20))
-					slog.Info("Command ran successfully", slogs.Command, cmd.String())
+					slog.Error("Command exec failed",
+						slogs.Command, cmd.String(),
+						slogs.Error, err,
+						"stderr", e.String(),
+					)
+					statusChan <- fmt.Sprintf("%s %s", failedPrefix, failureReason(err, e))
+					return
 				}
-				close(statusChan)
+				for _, l := range strings.Split(w.String(), "\n") {
+					if l != "" {
+						statusChan <- fmt.Sprintf("%s %s", outputPrefix, l)
+					}
+				}
+				statusChan <- fmt.Sprintf("Command completed successfully: %q", render.Truncate(cmd.String(), 20))
+				slog.Info("Command ran successfully", slogs.Command, cmd.String())
 			}()
 			return nil
 		}
-		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+		defer close(statusChan)
+		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, ui.RealStderr()
 		_, _ = cmd.Stdout.Write([]byte(opts.banner))
 
 		slog.Debug("Exec started")
@@ -599,8 +670,6 @@ func pipe(_ context.Context, opts *shellOpts, statusChan chan<- string, w, e *by
 		if err == nil {
 			statusChan <- fmt.Sprintf("Command completed successfully: %q", cmd.String())
 		}
-		close(statusChan)
-
 		if err != nil {
 			err = fmt.Errorf("command failed. Check k9s logs: %w", err)
 		}
@@ -608,22 +677,83 @@ func pipe(_ context.Context, opts *shellOpts, statusChan chan<- string, w, e *by
 		return err
 	}
 
+	defer close(statusChan)
+	if opts.background {
+		defer done()
+	}
 	last := len(cmds) - 1
+	cmds[0].Stdin = os.Stdin
 	for i := range cmds {
-		cmds[i].Stderr = os.Stderr
-		if i+1 < len(cmds) {
-			r, w := io.Pipe()
-			cmds[i].Stdout, cmds[i+1].Stdin = w, r
+		cmds[i].Stderr = ui.RealStderr()
+		if i < last {
+			// Use an OS pipe: it is closed when cmds[i] exits so the next
+			// command sees EOF (an io.Pipe writer would never be closed).
+			out, err := cmds[i].StdoutPipe()
+			if err != nil {
+				return err
+			}
+			cmds[i+1].Stdin = out
 		}
 	}
 	cmds[last].Stdout = os.Stdout
 
+	started := make([]*exec.Cmd, 0, len(cmds))
+	var errs error
 	for _, cmd := range cmds {
 		slog.Debug("Starting command", slogs.Command, cmd)
 		if err := cmd.Start(); err != nil {
-			return err
+			errs = err
+			break
+		}
+		started = append(started, cmd)
+	}
+	if errs != nil {
+		// A downstream command never started; earlier ones could block on a
+		// full pipe forever, so stop them before reaping.
+		for _, cmd := range started {
+			if cmd.Process != nil {
+				_ = cmd.Process.Kill()
+			}
+		}
+	}
+	// Reap every started command so none are left as zombies.
+	for i := len(started) - 1; i >= 0; i-- {
+		if err := started[i].Wait(); err != nil {
+			var ex *exec.ExitError
+			if errors.As(err, &ex) && !ex.Exited() {
+				continue
+			}
+			errs = errors.Join(errs, err)
 		}
 	}
 
-	return cmds[len(cmds)-1].Wait()
+	return errs
+}
+
+// failureReason returns the most useful line describing a failed command:
+// the last line it wrote to stderr, or the exec error itself.
+func failureReason(err error, stderr *bytes.Buffer) string {
+	ll := strings.Split(strings.TrimSpace(stderr.String()), "\n")
+	if l := strings.TrimSpace(ll[len(ll)-1]); l != "" {
+		return l
+	}
+
+	return err.Error()
+}
+
+// impersonateGroupArgs passes each impersonated group as its own flag:
+// kubectl reads --as-group as a list, so "a,b" would be one bogus group.
+func impersonateGroupArgs(a *App) []string {
+	gg := a.Conn().Config().Flags().ImpersonateGroup
+	if gg == nil {
+		return nil
+	}
+	args := make([]string, 0, 2*len(*gg))
+	for _, g := range *gg {
+		if g != "" {
+			args = append(args, "--as-group", g)
+		}
+	}
+
+	return args
 }

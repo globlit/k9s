@@ -13,8 +13,13 @@ import (
 
 type promptAction func(ctx context.Context)
 
-// ShowPrompt pops a prompt dialog.
-func ShowPrompt(styles *config.Dialog, pages *ui.Pages, title, msg string, action promptAction, cancel cancelFunc) {
+// ShowPrompt pops a prompt dialog. The action runs in a background goroutine;
+// queue is used to dismiss the dialog on the UI goroutine once the action
+// completes (tview is not thread safe). A nil queue dismisses inline.
+func ShowPrompt(styles *config.Dialog, pages *ui.Pages, queue func(func()), title, msg string, action promptAction, cancel cancelFunc) {
+	if queue == nil {
+		queue = func(f func()) { f() }
+	}
 	f := tview.NewForm()
 	f.SetItemPadding(0)
 	f.SetButtonsAlign(tview.AlignCenter).
@@ -55,6 +60,6 @@ func ShowPrompt(styles *config.Dialog, pages *ui.Pages, title, msg string, actio
 
 	go func() {
 		action(ctx)
-		dismiss(pages)
+		queue(func() { dismiss(pages) })
 	}()
 }
