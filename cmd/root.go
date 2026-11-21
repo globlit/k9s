@@ -18,6 +18,7 @@ import (
 	"github.com/derailed/k9s/internal/config"
 	"github.com/derailed/k9s/internal/config/data"
 	"github.com/derailed/k9s/internal/slogs"
+	"github.com/derailed/k9s/internal/ui"
 	"github.com/derailed/k9s/internal/view"
 	"github.com/lmittmann/tint"
 	"github.com/mattn/go-colorable"
@@ -80,15 +81,16 @@ func Execute() {
 	}
 }
 
-func run(*cobra.Command, []string) error {
+func run(*cobra.Command, []string) (err error) {
+	// Must happen before any Kubernetes client is created: client-go's exec
+	// credential plugins capture os.Stderr when their authenticator is built.
+	if restore, e := ui.CaptureStderr(); e == nil {
+		defer restore()
+	}
 	if err := config.InitLocs(); err != nil {
 		return err
 	}
-	logFile, err := os.OpenFile(
-		*k9sFlags.LogFile,
-		os.O_CREATE|os.O_APPEND|os.O_WRONLY,
-		data.DefaultFileMod,
-	)
+	logFile, err := openRotatingFile(*k9sFlags.LogFile, maxLogSize)
 	if err != nil {
 		return fmt.Errorf("log file %q init failed: %w", *k9sFlags.LogFile, err)
 	}
@@ -98,12 +100,14 @@ func run(*cobra.Command, []string) error {
 		}
 	}()
 	defer func() {
-		if err := recover(); err != nil {
-			slog.Error("Boom!! k9s init failed", slogs.Error, err)
+		if r := recover(); r != nil {
+			slog.Error("Boom!! k9s crashed", slogs.Error, r)
 			slog.Error("", slogs.Stack, string(debug.Stack()))
 			printLogo(color.Red)
 			fmt.Printf("%s", color.Colorize("Boom!! ", color.Red))
-			fmt.Printf("%v.\n", err)
+			fmt.Printf("%v.\n", r)
+			// Report the crash through the exit code instead of exiting 0.
+			err = fmt.Errorf("k9s crashed: %v", r)
 		}
 	}()
 
@@ -111,6 +115,8 @@ func run(*cobra.Command, []string) error {
 		Level:      parseLevel(*k9sFlags.LogLevel),
 		TimeFormat: time.RFC3339,
 	})))
+	applyMemoryLimit()
+	defer startProfiling()()
 
 	cfg, err := loadConfiguration()
 	if err != nil {
