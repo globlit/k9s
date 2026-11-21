@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -35,6 +36,7 @@ type Tree struct {
 	gvr         *client.GVR
 	namespace   string
 	root        *xray.TreeNode
+	rootMx      sync.RWMutex
 	listeners   []TreeListener
 	inUpdate    int32
 	refreshRate time.Duration
@@ -98,10 +100,9 @@ func (t *Tree) GetNamespace() string {
 // SetNamespace sets up model namespace.
 func (t *Tree) SetNamespace(ns string) {
 	t.namespace = ns
-	if t.root == nil {
-		return
+	if root := t.getRoot(); root != nil {
+		root.Clear()
 	}
-	t.root.Clear()
 }
 
 // SetRefreshRate sets model refresh duration.
@@ -121,12 +122,25 @@ func (t *Tree) InNamespace(ns string) bool {
 
 // Empty return true if no model data.
 func (t *Tree) Empty() bool {
-	return t.root.IsLeaf()
+	return t.getRoot().IsLeaf()
 }
 
 // Peek returns model data.
 func (t *Tree) Peek() *xray.TreeNode {
+	return t.getRoot()
+}
+
+func (t *Tree) getRoot() *xray.TreeNode {
+	t.rootMx.RLock()
+	defer t.rootMx.RUnlock()
+
 	return t.root
+}
+
+func (t *Tree) setRoot(root *xray.TreeNode) {
+	t.rootMx.Lock()
+	t.root = root
+	t.rootMx.Unlock()
 }
 
 // Describe describes a given resource.
@@ -167,7 +181,7 @@ func (t *Tree) updater(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			t.root = nil
+			t.setRoot(nil)
 			return
 		case <-time.After(rate):
 			rate = t.refreshRate
@@ -225,9 +239,9 @@ func (t *Tree) reconcile(ctx context.Context) error {
 	root.Sort()
 	// Keep the tree unfiltered: views filter it. Diffing filtered against
 	// unfiltered trees redraws on every tick.
-	if t.root == nil || t.root.Diff(root) {
-		t.root = root
-		t.fireTreeChanged(t.root)
+	if old := t.getRoot(); old == nil || old.Diff(root) {
+		t.setRoot(root)
+		t.fireTreeChanged(root)
 	}
 
 	return nil

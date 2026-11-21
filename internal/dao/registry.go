@@ -299,7 +299,7 @@ func loadHelm(m ResourceMetas) {
 		Name:       "history",
 		Kind:       "History",
 		Namespaced: true,
-		Verbs:      []string{verbDelete},
+		Verbs:      []string{},
 		Categories: []string{helmCat},
 	}
 }

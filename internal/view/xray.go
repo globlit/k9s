@@ -739,7 +739,7 @@ func (x *Xray) styleTitle() string {
 
 func (x *Xray) resourceDelete(gvr *client.GVR, spec *xray.NodeSpec, msg string) {
 	d := x.app.Styles.Dialog()
-	dialog.ShowDelete(&d, x.app.Content.Pages, msg, func(_ *metav1.DeletionPropagation, force bool) {
+	dialog.ShowDelete(&d, x.app.Content.Pages, msg, func(propagation *metav1.DeletionPropagation, force bool) {
 		x.app.Flash().Infof("Delete resource %s %s", spec.GVR(), spec.Path())
 		accessor, err := dao.AccessorFor(x.app.factory, gvr)
 		if err != nil {
@@ -759,15 +759,25 @@ func (x *Xray) resourceDelete(gvr *client.GVR, spec *xray.NodeSpec, msg string) 
 		if force {
 			grace = dao.ForceGrace
 		}
-		if err := nuker.Delete(context.Background(), spec.Path(), nil, grace); err != nil {
-			x.app.Flash().Errf("Delete failed with `%s", err)
-		} else {
-			x.app.Flash().Infof("%s `%s deleted successfully", x.GVR(), spec.Path())
-			if gvr == client.PodGVR {
-				x.app.factory.DeleteForwarder(spec.Path())
-			}
-		}
-		x.Refresh()
+		path := spec.Path()
+		runAsync(x.defaultContext(), x.app, []string{path}, "delete",
+			func(ctx context.Context, sel string) error {
+				if err := nuker.Delete(ctx, sel, propagation, grace); err != nil {
+					return err
+				}
+				if gvr == client.PodGVR {
+					x.app.factory.DeleteForwarder(sel)
+				}
+				return nil
+			},
+			func(_ []string, errs []error) {
+				if len(errs) > 0 {
+					x.app.Flash().Errf("Delete failed with `%s", errs[0])
+				} else {
+					x.app.Flash().Infof("%s `%s deleted successfully", x.GVR(), path)
+				}
+				x.Refresh()
+			})
 	}, func() {})
 }
 

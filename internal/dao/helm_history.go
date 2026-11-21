@@ -5,6 +5,7 @@ package dao
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -152,22 +153,8 @@ func (h *HelmHistory) Rollback(_ context.Context, path, rev string) error {
 	return clt.Run(n)
 }
 
-// Delete uninstall a Helm.
-func (h *HelmHistory) Delete(_ context.Context, path string, _ *metav1.DeletionPropagation, _ Grace) error {
-	ns, n := client.Namespaced(path)
-	cfg, err := helmConfigFor(h.Client().Config().Flags(), ns)
-	if err != nil {
-		return err
-	}
-
-	res, err := action.NewUninstall(cfg).Run(n)
-	if err != nil {
-		return err
-	}
-
-	if res != nil && res.Info != "" {
-		return fmt.Errorf("%s", res.Info)
-	}
-
-	return nil
+// Delete refuses to act. Helm cannot delete one revision, and an uninstall
+// removes all revisions of the release.
+func (*HelmHistory) Delete(context.Context, string, *metav1.DeletionPropagation, Grace) error {
+	return errors.New("deleting a revision is not supported")
 }
