@@ -140,7 +140,7 @@ func (p *Pod) Render(o any, _ string, row *model1.Row) error {
 	if p.specs.isEmpty() {
 		return nil
 	}
-	cols, err := p.specs.realize(pwm.Raw.DeepCopy(), defaultPodHeader, row)
+	cols, err := p.specs.realize(pwm.Raw, defaultPodHeader, row)
 	cols.hydrateRow(row)
 
 	return err
@@ -365,7 +365,7 @@ func cosRequests(cc []v1.Container) (cpuQ, memQ, gpuQ *resource.Quantity) {
 }
 
 func extractGPU(rl v1.ResourceList) *resource.Quantity {
-	for _, v := range config.KnownGPUVendors {
+	for _, v := range config.KnownGPUVendors() {
 		if q, ok := rl[v1.ResourceName(v)]; ok {
 			return &q
 		}

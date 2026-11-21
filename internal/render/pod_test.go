@@ -6,6 +6,7 @@ package render_test
 import (
 	"testing"
 
+	k9scfg "github.com/derailed/k9s/internal/config"
 	"github.com/derailed/k9s/internal/model1"
 	"github.com/derailed/k9s/internal/render"
 	"github.com/derailed/tcell/v2"
@@ -874,5 +875,27 @@ func makeRes(c, m string) v1.ResourceList {
 	return v1.ResourceList{
 		v1.ResourceCPU:    cpu,
 		v1.ResourceMemory: mem,
+	}
+}
+
+func BenchmarkPodRenderCustomCols(b *testing.B) {
+	pom := render.PodWithMetrics{
+		Raw: load(b, "po"),
+		MX:  makePodMX("nginx", "10m", "10Mi"),
+	}
+	po := render.NewPod()
+	po.SetViewSetting(&k9scfg.ViewSetting{Columns: []string{
+		"NAME",
+		"IMAGE:.spec.containers[0].image",
+		"NODE:.spec.nodeName",
+		"PHASE:|.status.phase|",
+		"STATUS",
+	}})
+	r := model1.NewRow(12)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		_ = po.Render(&pom, "", &r)
 	}
 }

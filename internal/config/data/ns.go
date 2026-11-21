@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"slices"
 	"sync"
+	"sync/atomic"
 
 	"github.com/derailed/k9s/internal/client"
 	"github.com/derailed/k9s/internal/slogs"
@@ -23,6 +24,7 @@ type Namespace struct {
 	LockFavorites bool     `yaml:"lockFavorites"`
 	Favorites     []string `yaml:"favorites"`
 	mx            sync.RWMutex
+	validating    atomic.Bool
 }
 
 // NewNamespace create a new namespace configuration.
@@ -60,23 +62,71 @@ func (n *Namespace) merge(old *Namespace) {
 
 // Validate validates a namespace is setup correctly.
 func (n *Namespace) Validate(conn client.Connection) {
+	n.mx.Lock()
+	n.trimFavNs()
+	active, favs := n.Active, slices.Clone(n.Favorites)
+	n.mx.Unlock()
+
+	if conn == nil || !n.validating.CompareAndSwap(false, true) {
+		return
+	}
+	// Checking namespaces may LIST them all: never block startup or the UI
+	// on it. Invalid favorites are pruned once the answer comes back.
+	go func() {
+		defer n.validating.Store(false)
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("Namespace validation panicked", slogs.Error, r)
+			}
+		}()
+
+		if !conn.IsValidNamespace(active) {
+			return
+		}
+		invalid := make([]string, 0, len(favs))
+		for _, ns := range favs {
+			if !conn.IsValidNamespace(ns) {
+				slog.Debug("Invalid favorite found", slogs.Namespace, ns)
+				invalid = append(invalid, ns)
+			}
+		}
+		if len(invalid) == 0 {
+			return
+		}
+		n.mx.Lock()
+		defer n.mx.Unlock()
+		for _, ns := range invalid {
+			n.rmFavNS(ns)
+		}
+	}()
+}
+
+// nsYAML is the serialized form of Namespace.
+type nsYAML struct {
+	Active        string   `yaml:"active"`
+	LockFavorites bool     `yaml:"lockFavorites"`
+	Favorites     []string `yaml:"favorites"`
+}
+
+// MarshalYAML snapshots the namespace under its lock: favorites may be
+// pruned by a background validation while the config is being saved.
+func (n *Namespace) MarshalYAML() (any, error) {
 	n.mx.RLock()
 	defer n.mx.RUnlock()
 
-	if conn == nil || !conn.IsValidNamespace(n.Active) {
-		return
-	}
-	for _, ns := range n.Favorites {
-		if !conn.IsValidNamespace(ns) {
-			slog.Debug("Invalid favorite found",
-				slogs.Namespace, ns,
-				slogs.AllNS, n.isAllNamespaces(),
-			)
-			n.rmFavNS(ns)
-		}
-	}
+	return nsYAML{
+		Active:        n.Active,
+		LockFavorites: n.LockFavorites,
+		Favorites:     slices.Clone(n.Favorites),
+	}, nil
+}
 
-	n.trimFavNs()
+// FavoriteNamespaces returns a copy of the favorite namespaces.
+func (n *Namespace) FavoriteNamespaces() []string {
+	n.mx.RLock()
+	defer n.mx.RUnlock()
+
+	return slices.Clone(n.Favorites)
 }
 
 // SetActive set the active namespace.

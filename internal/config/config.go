@@ -185,7 +185,7 @@ func (c *Config) FavNamespaces() []string {
 	}
 	ct.Validate(c.conn, c.K9s.getActiveContextName(), ct.ClusterName)
 
-	return ct.Namespace.Favorites
+	return ct.Namespace.FavoriteNamespaces()
 }
 
 // SetActiveNamespace set the active namespace in the current context.

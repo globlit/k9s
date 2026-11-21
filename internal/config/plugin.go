@@ -4,7 +4,6 @@
 package config
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -164,9 +163,6 @@ func (p *Plugins) load(path string) error {
 		return fmt.Errorf("plugin validation failed for %s: %w", path, err)
 	}
 
-	d := yaml.NewDecoder(bytes.NewReader(bb))
-	d.KnownFields(true)
-
 	switch scheme {
 	case json.PluginSchema:
 		var o Plugin
@@ -182,25 +178,31 @@ func (p *Plugins) load(path string) error {
 		if err := yaml.Unmarshal(bb, &oo); err != nil {
 			return fmt.Errorf("plugin unmarshal failed for %s: %w", path, err)
 		}
+		var errs error
 		for k := range oo.Plugins {
 			plug := oo.Plugins[k]
 			if err := plug.Validate(); err != nil {
-				return fmt.Errorf("plugin %q validation failed for %s: %w", k, path, err)
+				errs = errors.Join(errs, fmt.Errorf("plugin %q validation failed for %s: %w", k, path, err))
+				continue
 			}
 			p.Plugins[k] = plug
 		}
+		return errs
 	case json.PluginMultiSchema:
 		var oo plugins
 		if err := yaml.Unmarshal(bb, &oo); err != nil {
 			return fmt.Errorf("plugin unmarshal failed for %s: %w", path, err)
 		}
+		var errs error
 		for k := range oo {
 			plug := oo[k]
 			if err := plug.Validate(); err != nil {
-				return fmt.Errorf("plugin %q validation failed for %s: %w", k, path, err)
+				errs = errors.Join(errs, fmt.Errorf("plugin %q validation failed for %s: %w", k, path, err))
+				continue
 			}
 			p.Plugins[k] = plug
 		}
+		return errs
 	}
 
 	return nil

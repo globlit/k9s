@@ -72,6 +72,20 @@ func (a *Aliases) ShortNames() ShortNames {
 	return m
 }
 
+// Keys returns a snapshot of all alias names.
+// It is safe to call while aliases are being redefined.
+func (a *Aliases) Keys() []string {
+	a.mx.RLock()
+	defer a.mx.RUnlock()
+
+	kk := make([]string, 0, len(a.Alias))
+	for k := range a.Alias {
+		kk = append(kk, k)
+	}
+
+	return kk
+}
+
 // Clear remove all aliases.
 func (a *Aliases) Clear() {
 	a.mx.Lock()
@@ -165,6 +179,11 @@ func (a *Aliases) LoadFile(path string) error {
 	}
 
 	for k, v := range a.Alias {
+		if v == nil {
+			slog.Warn("Skipping alias with no resource", slogs.Key, k)
+			delete(a.Alias, k)
+			continue
+		}
 		a.Alias[k] = client.NewGVR(v.String())
 	}
 

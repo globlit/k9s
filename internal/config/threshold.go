@@ -64,7 +64,7 @@ func NewThreshold() Threshold {
 func (t Threshold) Validate() Threshold {
 	for _, k := range []string{CPU, MEM} {
 		v, ok := t[k]
-		if !ok {
+		if !ok || v == nil {
 			t[k] = NewSeverity()
 		} else {
 			v.Validate()
@@ -72,6 +72,18 @@ func (t Threshold) Validate() Threshold {
 	}
 
 	return t
+}
+
+// IsValid reports whether Validate would change anything.
+func (t Threshold) IsValid() bool {
+	for _, k := range []string{CPU, MEM} {
+		v, ok := t[k]
+		if !ok || v == nil || !validateRange(v.Warn) || !validateRange(v.Critical) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // LevelFor returns a defcon level for the current state.

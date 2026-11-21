@@ -86,15 +86,9 @@ func hotKeyActions(r Runner, aa *ui.KeyActions) error {
 			)
 		}
 
-		command, err := r.EnvFn()().Substitute(hk.Command)
-		if err != nil {
-			slog.Warn("Invalid shortcut command", slogs.Error, err)
-			continue
-		}
-
 		aa.Add(key, ui.NewKeyActionWithOpts(
 			hk.Description,
-			gotoCmd(r, command, "", !hk.KeepHistory),
+			hotKeyCmd(r, hk.Command, !hk.KeepHistory),
 			ui.ActionOpts{
 				Shared: true,
 				HotKey: true,
@@ -105,9 +99,21 @@ func hotKeyActions(r Runner, aa *ui.KeyActions) error {
 	return errs
 }
 
-func gotoCmd(r Runner, cmd, path string, clearStack bool) ui.ActionHandler {
+// hotKeyCmd substitutes env vars ($NAME, $NAMESPACE, ...) when the key is
+// pressed, so they reflect the current selection rather than the one at
+// bind time.
+func hotKeyCmd(r Runner, cmd string, clearStack bool) ui.ActionHandler {
 	return func(*tcell.EventKey) *tcell.EventKey {
-		r.App().gotoResource(cmd, path, clearStack, true)
+		command := cmd
+		if fn := r.EnvFn(); fn != nil {
+			c, err := fn().Substitute(cmd)
+			if err != nil {
+				r.App().Flash().Errf("Invalid hotkey command %q: %s", cmd, err)
+				return nil
+			}
+			command = c
+		}
+		r.App().gotoResource(command, "", clearStack, true)
 		return nil
 	}
 }
@@ -129,12 +135,12 @@ func pluginActions(r Runner, aa *ui.KeyActions) error {
 		return err
 	}
 	pp := config.NewPlugins()
-	if err := pp.Load(path, true); err != nil {
-		return err
-	}
+	// Load keeps every valid plugin and reports the invalid ones: one bad
+	// plugin must not disable all of them.
+	loadErr := pp.Load(path, true)
 
 	var (
-		errs    error
+		errs    = loadErr
 		aliases = r.Aliases()
 		ro      = r.App().Config.IsReadOnly()
 	)
@@ -248,13 +254,19 @@ func executePlugin(r Runner, p *config.Plugin, inputValues dialog.PluginInputVal
 			}
 		}
 		go func() {
+			var shown bool
+			// Always drain the channel so the producer never blocks forever.
 			for st := range statusChan {
+				if msg, ok := strings.CutPrefix(st, failedPrefix); ok {
+					r.App().Flash().Errf("Plugin %q failed: %s", p.Description, strings.TrimSpace(msg))
+					continue
+				}
 				if !p.OverwriteOutput {
 					r.App().Flash().Infof("Plugin command launched successfully: %q", st)
-				} else if strings.Contains(st, outputPrefix) {
+				} else if !shown && strings.Contains(st, outputPrefix) {
 					infoMsg := strings.TrimPrefix(st, outputPrefix)
 					r.App().Flash().Info(strings.TrimSpace(infoMsg))
-					return
+					shown = true
 				}
 			}
 		}()

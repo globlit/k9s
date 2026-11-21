@@ -66,20 +66,48 @@ func WriteYAML(content any) ([]byte, error) {
 }
 
 // SaveYAML writes a yaml file to disk.
-func SaveYAML(path string, content any) (err error) {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_TRUNC, DefaultFileMod)
+func SaveYAML(path string, content any) error {
+	bb, err := WriteYAML(content)
 	if err != nil {
 		return err
 	}
+
+	return WriteFileAtomic(path, bb, DefaultFileMod)
+}
+
+// WriteFileAtomic writes bb to a temp file in the same directory, syncs it
+// and renames it over path, so a crash, a full disk, or a concurrent k9s
+// instance can never leave a truncated or interleaved file behind.
+// Symlinks are resolved first (dotfiles setups) so the link itself survives.
+func WriteFileAtomic(path string, bb []byte, mod os.FileMode) (err error) {
+	if p, e := filepath.EvalSymlinks(path); e == nil {
+		path = p
+	}
+	f, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
 	defer func() {
-		err = errors.Join(err, f.Close())
+		if err != nil {
+			_ = os.Remove(tmp)
+		}
 	}()
 
-	ec := yaml.NewEncoder(f)
-	ec.SetIndent(2)
-	if err := ec.Encode(content); err != nil {
+	if _, err = f.Write(bb); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err = f.Sync(); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err = f.Close(); err != nil {
+		return err
+	}
+	if err = os.Chmod(tmp, mod); err != nil {
 		return err
 	}
 
-	return ec.Close()
+	return os.Rename(tmp, path)
 }

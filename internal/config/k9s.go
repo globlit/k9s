@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/derailed/k9s/internal/client"
@@ -23,8 +24,38 @@ import (
 
 type gpuVendors map[string]string
 
-// KnownGPUVendors tracks a set of known GPU vendors.
-var KnownGPUVendors = defaultGPUVendors
+// knownGPUVendors tracks a set of known GPU vendors. The map is treated as
+// immutable: updates swap in a new map so readers never race with writers.
+var knownGPUVendors atomic.Pointer[gpuVendors]
+
+func init() {
+	vv := make(gpuVendors, len(defaultGPUVendors))
+	for k, v := range defaultGPUVendors {
+		vv[k] = v
+	}
+	knownGPUVendors.Store(&vv)
+}
+
+// KnownGPUVendors returns a read-only snapshot of known GPU vendors.
+// Callers must not mutate the returned map.
+func KnownGPUVendors() map[string]string {
+	return *knownGPUVendors.Load()
+}
+
+func mergeGPUVendors(extra gpuVendors) {
+	if len(extra) == 0 {
+		return
+	}
+	cur := *knownGPUVendors.Load()
+	vv := make(gpuVendors, len(cur)+len(extra))
+	for k, v := range cur {
+		vv[k] = v
+	}
+	for k, v := range extra {
+		vv[k] = v
+	}
+	knownGPUVendors.Store(&vv)
+}
 
 var defaultGPUVendors = gpuVendors{
 	"nvidia":        "nvidia.com/gpu",
@@ -134,9 +165,7 @@ func (k *K9s) Merge(k1 *K9s) {
 	k.mx.Lock()
 	defer k.mx.Unlock()
 
-	for k, v := range k1.GPUVendors {
-		KnownGPUVendors[k] = v
-	}
+	mergeGPUVendors(k1.GPUVendors)
 
 	k.LiveViewAutoRefresh = k1.LiveViewAutoRefresh
 	k.DefaultView = k1.DefaultView
@@ -287,6 +316,12 @@ func (k *K9s) ActivateContext(contextName string) (*data.Context, error) {
 			if !k.conn.CheckConnectivity() {
 				return nil, fmt.Errorf("unable to connect to context %q", contextName)
 			}
+		}
+	} else {
+		// Don't carry the previous context's proxy over to this one.
+		k.ks.SetProxy(nil)
+		if k.conn != nil && k.conn.Config() != nil {
+			k.conn.Config().SetProxy(nil)
 		}
 	}
 
@@ -473,8 +508,17 @@ func (k *K9s) Validate(c client.Connection, contextName, clusterName string) {
 	if k.ShellPod != nil {
 		k.ShellPod.Validate()
 	}
-	k.Logger = k.Logger.Validate()
-	k.Thresholds = k.Thresholds.Validate()
+	// Validate runs on every config save while views read these settings
+	// from refresh goroutines: only write them when something actually
+	// needs fixing.
+	if l := k.Logger.Validate(); l != k.Logger {
+		k.Logger = l
+	}
+	if k.Thresholds == nil {
+		k.Thresholds = NewThreshold()
+	} else if !k.Thresholds.IsValid() {
+		k.Thresholds.Validate()
+	}
 
 	if cfg := k.getActiveConfig(); cfg != nil {
 		cfg.Validate(c, contextName, clusterName)

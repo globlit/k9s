@@ -258,7 +258,7 @@ func TestContextAliasesPath(t *testing.T) {
 		},
 		"happy": {
 			ct: "ct-1-1",
-			e:  "/tmp/test/cl-1/ct-1-1/aliases.yaml",
+			e:  "cl-1/ct-1-1/aliases.yaml",
 		},
 	}
 
@@ -267,7 +267,11 @@ func TestContextAliasesPath(t *testing.T) {
 		t.Run(k, func(t *testing.T) {
 			c := mock.NewMockConfig(t)
 			_, _ = c.K9s.ActivateContext(u.ct)
-			assert.Equal(t, u.e, c.ContextAliasesPath())
+			e := u.e
+			if e != "" {
+				e = filepath.Join(config.AppContextsDir, e)
+			}
+			assert.Equal(t, e, c.ContextAliasesPath())
 		})
 	}
 }
@@ -282,7 +286,7 @@ func TestContextPluginsPath(t *testing.T) {
 		},
 		"happy": {
 			ct: "ct-1-1",
-			e:  "/tmp/test/cl-1/ct-1-1/plugins.yaml",
+			e:  "cl-1/ct-1-1/plugins.yaml",
 		},
 		"not-exists": {
 			ct:  "fred",
@@ -299,7 +303,11 @@ func TestContextPluginsPath(t *testing.T) {
 			if err != nil {
 				assert.Equal(t, u.err, err)
 			}
-			assert.Equal(t, u.e, s)
+			e := u.e
+			if e != "" {
+				e = filepath.Join(config.AppContextsDir, e)
+			}
+			assert.Equal(t, e, s)
 		})
 	}
 }

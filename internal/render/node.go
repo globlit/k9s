@@ -269,8 +269,9 @@ func gatherNodeMX(no *v1.Node, mx *mv1beta1.NodeMetrics) (c, a metric) {
 }
 
 func extractNodeGPU(rl v1.ResourceList) (main, shared *resource.Quantity) {
-	mm := make(map[string]*resource.Quantity, len(config.KnownGPUVendors))
-	for _, v := range config.KnownGPUVendors {
+	vendors := config.KnownGPUVendors()
+	mm := make(map[string]*resource.Quantity, len(vendors))
+	for _, v := range vendors {
 		if q, ok := rl[v1.ResourceName(v)]; ok {
 			mm[v] = &q
 		}

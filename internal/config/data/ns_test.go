@@ -10,6 +10,7 @@ import (
 	"github.com/derailed/k9s/internal/config/mock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestNSValidate(t *testing.T) {
@@ -74,4 +75,24 @@ func TestNSValidateRmFavs(t *testing.T) {
 	ns.Validate(mock.NewMockConnection())
 
 	assert.Equal(t, []string{"default", "fred"}, ns.Favorites)
+}
+
+func TestNSMarshalYAMLConcurrentValidate(t *testing.T) {
+	ns := data.NewNamespace()
+	ns.Favorites = []string{"default", "fred", "blee"}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for range 50 {
+			ns.Validate(mock.NewMockConnection())
+		}
+	}()
+	for range 50 {
+		bb, err := yaml.Marshal(struct {
+			NS *data.Namespace `yaml:"namespace"`
+		}{NS: ns})
+		require.NoError(t, err)
+		assert.Contains(t, string(bb), "favorites:")
+	}
+	<-done
 }
