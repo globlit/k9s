@@ -52,6 +52,9 @@ func Highlight(bb []byte, ii []int, c int) []byte {
 	// Create a map of byte positions that should be highlighted
 	highlightMap := make(map[int]bool)
 	for _, pos := range ii {
+		for pos > 0 && pos < len(bb) && bb[pos]&0xC0 == 0x80 {
+			pos--
+		}
 		highlightMap[pos] = true
 	}
 
@@ -72,8 +75,8 @@ func Highlight(bb []byte, ii []int, c int) []byte {
 				result = append(result, []byte(colored)...)
 				i = charEnd - 1 // Skip the rest of the character bytes
 			} else {
-				// This is a continuation byte, skip it (already handled)
-				continue
+				// Keep a stray continuation byte.
+				result = append(result, bb[i])
 			}
 		} else {
 			result = append(result, bb[i])

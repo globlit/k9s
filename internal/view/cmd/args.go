@@ -7,6 +7,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"unicode"
 )
 
 const (
@@ -96,16 +97,27 @@ func (a args) String() string {
 		case labelKey:
 			v = "'" + v + "'"
 		case filterKey:
-			v = filterFlag + v
+			v = quoteSpaced(filterFlag + v)
 		case fuzzyKey:
-			v = fuzzyFlag + " " + v
+			v = fuzzyFlag + " " + quoteSpaced(v)
 		case contextKey:
-			v = contextFlag + v
+			v = quoteSpaced(contextFlag + v)
+		default:
+			v = quoteSpaced(v)
 		}
 		ss = append(ss, v)
 	}
 
 	return strings.Join(ss, " ")
+}
+
+// quoteSpaced puts quotes around s when s has spaces.
+func quoteSpaced(s string) string {
+	if strings.ContainsFunc(s, unicode.IsSpace) {
+		return "'" + s + "'"
+	}
+
+	return s
 }
 
 func (a args) hasFilters() bool {

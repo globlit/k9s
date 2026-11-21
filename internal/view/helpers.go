@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/globlit/k9s/internal"
 	"github.com/globlit/k9s/internal/client"
@@ -276,6 +277,10 @@ func linesWithRegions(lines []string, matches fuzzy.Matches) []string {
 		for _, loc := range dao.ContinuousRanges(m.MatchedIndexes) {
 			start, end := loc[0]+offsetForLine[m.Index], loc[1]+offsetForLine[m.Index]
 			line := ll[m.Index]
+			if end > 0 && end <= len(line) {
+				_, w := utf8.DecodeRuneInString(line[end-1:])
+				end += w - 1
+			}
 			if end > len(line) {
 				end = len(line)
 			}
