@@ -1,0 +1,66 @@
+name: K9s Bench
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+env:
+  BENCHSTAT: golang.org/x/perf/cmd/benchstat@v0.0.0-20261117185222-4febdb082b2c
+  BENCH_ARGS: -count 6 -run ^$ -bench . -benchmem -p 1 ./internal/...
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Install Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Install benchstat
+        run: go install "$BENCHSTAT"
+
+      - name: Bench head
+        run: |
+          cp hack/benchcheck.py "$RUNNER_TEMP/"
+          go test $BENCH_ARGS | tee "$RUNNER_TEMP/head.txt"
+
+      - name: Bench base
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || 'origin/master' }}
+        run: |
+          git checkout --detach "$BASE_SHA"
+          go test $BENCH_ARGS | tee "$RUNNER_TEMP/base.txt" || echo "::warning::base benchmarks failed"
+
+      - name: Compare
+        working-directory: ${{ runner.temp }}
+        run: |
+          benchstat base.txt head.txt > benchstat.txt
+          benchstat -format csv base.txt head.txt > benchstat.csv
+          set +e
+          python3 benchcheck.py benchstat.csv 10 > report.md
+          rc=$?
+          set -e
+          cat report.md
+          {
+            cat report.md
+            echo '<details><summary>benchstat</summary>'
+            echo
+            echo '```'
+            cat benchstat.txt
+            echo '```'
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"
