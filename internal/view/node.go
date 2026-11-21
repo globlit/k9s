@@ -6,6 +6,7 @@ package view
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"time"
 
@@ -119,19 +120,38 @@ func drainNode(v ResourceViewer, sels []string, opts dao.DrainOptions) {
 	}
 
 	v.Stop()
-	defer v.Start()
-	{
-		d := NewDetails(v.App(), "Drain Progress", "nodes", contentYAML, true)
-		if err := v.App().inject(d, false); err != nil {
-			v.App().Flash().Err(err)
-		}
+	d := NewDetails(v.App(), "Drain Progress", "nodes", contentYAML, true)
+	if err := v.App().inject(d, false); err != nil {
+		v.App().Flash().Err(err)
+	}
+	// Draining evicts pods one by one and can take minutes (or forever with
+	// no timeout): never do it on the UI goroutine.
+	w := &drawWriter{w: d.GetWriter(), app: v.App()}
+	go func() {
+		defer internal.LogPanic("node drain")
 		for _, sel := range sels {
-			if err := m.Drain(sel, opts, d.GetWriter()); err != nil {
+			if err := m.Drain(sel, opts, w); err != nil {
 				v.App().Flash().Err(err)
 			}
 		}
-		v.Refresh()
-	}
+		v.App().QueueUpdateDraw(func() {
+			v.Start()
+			v.Refresh()
+		})
+	}()
+}
+
+// drawWriter writes to a goroutine-safe text view and asks the UI to redraw.
+type drawWriter struct {
+	w   io.Writer
+	app *App
+}
+
+func (d *drawWriter) Write(p []byte) (int, error) {
+	n, err := d.w.Write(p)
+	d.app.QueueUpdateDraw(func() {})
+
+	return n, err
 }
 
 func (n *Node) toggleCordonCmd(cordon bool) func(evt *tcell.EventKey) *tcell.EventKey {

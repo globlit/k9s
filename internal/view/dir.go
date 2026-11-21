@@ -212,27 +212,36 @@ func (d *Dir) applyCmd(evt *tcell.EventKey) *tcell.EventKey {
 	if isKustomized(sel) {
 		opts = []string{"-k"}
 	}
+	args := make([]string, 0, 10)
+	args = append(args, "apply")
+	args = append(args, opts...)
+	args = append(args, sel)
+	d.runManifestCmd("Applied Manifest", sel, args)
+
+	return nil
+}
+
+// runManifestCmd runs kubectl off the UI goroutine (apply/delete of large
+// manifests can take a while) and shows the outcome when done.
+func (d *Dir) runManifestCmd(title, sel string, args []string) {
 	d.Stop()
-	defer d.Start()
-	{
-		args := make([]string, 0, 10)
-		args = append(args, "apply")
-		args = append(args, opts...)
-		args = append(args, sel)
+	d.App().Flash().Infof("Running kubectl %s on %s...", args[0], sel)
+	go func() {
+		defer internal.LogPanic("kubectl " + args[0])
 		res, err := runKu(context.Background(), d.App(), &shellOpts{clear: false, args: args})
 		if err != nil {
 			res = "status:\n  " + err.Error() + "\nmessage:\n" + fmtResults(res)
 		} else {
 			res = "message:\n" + fmtResults(res)
 		}
-
-		details := NewDetails(d.App(), "Applied Manifest", sel, contentYAML, true).Update(res)
-		if err := d.App().inject(details, false); err != nil {
-			d.App().Flash().Err(err)
-		}
-	}
-
-	return nil
+		d.App().QueueUpdateDraw(func() {
+			d.Start()
+			details := NewDetails(d.App(), title, sel, contentYAML, true).Update(res)
+			if err := d.App().inject(details, false); err != nil {
+				d.App().Flash().Err(err)
+			}
+		})
+	}()
 }
 
 func (d *Dir) delCmd(evt *tcell.EventKey) *tcell.EventKey {
@@ -251,8 +260,6 @@ func (d *Dir) delCmd(evt *tcell.EventKey) *tcell.EventKey {
 		msgResource = "kustomization"
 	}
 
-	d.Stop()
-	defer d.Start()
 	msg := fmt.Sprintf("Delete resource(s) in %s %s", msgResource, sel)
 	dlg := d.App().Styles.Dialog()
 	dialog.ShowConfirm(&dlg, d.App().Content.Pages, "Confirm Delete", msg, func() {
@@ -260,16 +267,7 @@ func (d *Dir) delCmd(evt *tcell.EventKey) *tcell.EventKey {
 		args = append(args, "delete")
 		args = append(args, opts...)
 		args = append(args, sel)
-		res, err := runKu(context.Background(), d.App(), &shellOpts{clear: false, args: args})
-		if err != nil {
-			res = "status:\n  " + err.Error() + "\nmessage:\n" + fmtResults(res)
-		} else {
-			res = "message:\n" + fmtResults(res)
-		}
-		details := NewDetails(d.App(), "Deleted Manifest", sel, contentYAML, true).Update(res)
-		if err := d.App().inject(details, false); err != nil {
-			d.App().Flash().Err(err)
-		}
+		d.runManifestCmd("Deleted Manifest", sel, args)
 	}, func() {})
 
 	return nil

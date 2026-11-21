@@ -60,6 +60,7 @@ func (*ImageScan) viewCVE(app *App, _ ui.Tabular, _ *client.GVR, path string) {
 	tt := strings.Split(path, "|")
 	if len(tt) < 7 {
 		app.Flash().Errf("parse path failed: %s", path)
+		return
 	}
 	cve := tt[render.CVEParseIdx]
 	site := cveGovURL

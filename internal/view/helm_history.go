@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/derailed/k9s/internal"
 	"github.com/derailed/k9s/internal/client"
 	"github.com/derailed/k9s/internal/dao"
 	"github.com/derailed/k9s/internal/model"
@@ -105,13 +106,22 @@ func (h *History) rollbackCmd(evt *tcell.EventKey) *tcell.EventKey {
 	defer h.Start()
 	msg := fmt.Sprintf("RollingBack chart [yellow::b]%s[-::-] to release <[orangered::b]%s[-::-]>?", n, rev)
 	dialog.ShowConfirmAck(h.App().App, h.App().Content.Pages, n, false, "Confirm Rollback", msg, func() {
-		ctx, cancel := context.WithTimeout(context.Background(), h.App().Conn().Config().CallTimeout())
-		defer cancel()
-		if err := h.rollback(ctx, client.FQN(ns, n), rev); err != nil {
-			h.App().Flash().Err(err)
-		} else {
-			h.App().Flash().Infof("Rollout restart in progress for char `%s...", n)
-		}
+		h.App().Flash().Infof("Rolling back chart `%s...", n)
+		// A rollback can take up to the call timeout: keep the UI responsive.
+		go func() {
+			defer internal.LogPanic("helm rollback")
+			ctx, cancel := context.WithTimeout(context.Background(), h.App().Conn().Config().CallTimeout())
+			defer cancel()
+			err := h.rollback(ctx, client.FQN(ns, n), rev)
+			h.App().QueueUpdateDraw(func() {
+				if err != nil {
+					h.App().Flash().Err(err)
+					return
+				}
+				h.App().Flash().Infof("Rollout restart in progress for chart `%s...", n)
+				h.Refresh()
+			})
+		}()
 	}, func() {})
 
 	return nil
@@ -120,10 +130,6 @@ func (h *History) rollbackCmd(evt *tcell.EventKey) *tcell.EventKey {
 func (h *History) rollback(ctx context.Context, path, rev string) error {
 	var hm dao.HelmHistory
 	hm.Init(h.App().factory, h.GVR())
-	if err := hm.Rollback(ctx, path, rev); err != nil {
-		return err
-	}
-	h.Refresh()
 
-	return nil
+	return hm.Rollback(ctx, path, rev)
 }

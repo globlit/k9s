@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"maps"
 	"os"
 	"os/signal"
 	"sort"
@@ -182,14 +181,31 @@ func (a *App) layout(ctx context.Context) {
 	}
 }
 
-func (*App) initSignals() {
+// initSignals shuts k9s down cleanly on SIGHUP/SIGTERM so the terminal is
+// restored and node-shell pods and port-forwards are cleaned up.
+// SIGINT is deliberately not handled here: while k9s runs, Ctrl-C is a key
+// event, and while a shell is suspended it belongs to the child process.
+func (a *App) initSignals() {
 	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGHUP)
+	signal.Notify(sig, syscall.SIGHUP, syscall.SIGTERM)
 
-	go func(sig chan os.Signal) {
-		<-sig
-		os.Exit(0)
-	}(sig)
+	go func() {
+		s := <-sig
+		slog.Warn("Received signal, shutting down", slogs.Sig, s)
+		done := make(chan struct{})
+		a.QueueUpdate(func() {
+			close(done)
+			a.BailOut(0)
+		})
+		select {
+		case <-done:
+		case <-time.After(3 * time.Second):
+			// The event loop is not processing updates (e.g. suspended).
+			slog.Warn("Forced exit: UI did not shut down in time")
+			ui.RunExitHooks()
+			os.Exit(0)
+		}
+	}()
 }
 
 func (a *App) suggestCommand() model.SuggestionFunc {
@@ -207,7 +223,7 @@ func (a *App) suggestCommand() model.SuggestionFunc {
 		}
 
 		ls := strings.ToLower(s)
-		for alias := range maps.Keys(a.command.alias.Alias) {
+		for _, alias := range a.command.alias.Keys() {
 			if suggest, ok := cmd.ShouldAddSuggest(ls, alias); ok {
 				entries = append(entries, suggest)
 			}
@@ -360,18 +376,17 @@ func (a *App) Resume() {
 }
 
 func (a *App) clusterUpdater(ctx context.Context) {
+	defer internal.LogPanic("cluster updater")
 	if a.Conn() == nil || !a.Conn().ConnectionOK() || a.factory == nil || a.clusterModel == nil {
 		slog.Debug("Skipping cluster updater - no valid connection")
 		return
 	}
 
-	if err := a.refreshCluster(ctx); err != nil {
-		slog.Error("Cluster updater failed!", slogs.Error, err)
-		return
-	}
-
 	bf := model.NewExpBackOff(ctx, clusterRefresh, 2*time.Minute)
-	delay := clusterRefresh
+	// Check right away, then keep checking. A failed check (e.g. VPN
+	// reconnecting right after a shell session) must back off and retry, not
+	// stop health checks for the rest of the session.
+	var delay time.Duration
 	for {
 		select {
 		case <-ctx.Done():
@@ -379,9 +394,10 @@ func (a *App) clusterUpdater(ctx context.Context) {
 			return
 		case <-time.After(delay):
 			if err := a.refreshCluster(ctx); err != nil {
-				slog.Error("Cluster updates failed. Giving up ;(", slogs.Error, err)
+				slog.Error("Cluster update failed", slogs.Error, err)
 				if delay = bf.NextBackOff(); delay == backoff.Stop {
-					a.BailOut(1)
+					slog.Error("Cluster updates failed. Giving up ;(")
+					a.QueueUpdate(func() { a.BailOut(1) })
 					return
 				}
 			} else {
@@ -403,15 +419,19 @@ func (a *App) refreshCluster(context.Context) error {
 			atomic.StoreInt32(&a.conRetry, 0)
 			a.Status(model.FlashInfo, "K8s connectivity OK")
 			if c != nil {
-				c.Start()
+				// Views are tview primitives: mutate them on the UI goroutine.
+				a.QueueUpdateDraw(c.Start)
 			}
 		} else {
-			a.ClearStatus(true)
+			// Don't clear the flash: messages expire on their own, and this
+			// runs every check, wiping whatever was just reported (e.g. an
+			// auth plugin URL captured during this very request).
+			a.ClearStatus(false)
 		}
 		a.factory.ValidatePortForwards()
 	} else if c != nil {
 		atomic.AddInt32(&a.conRetry, 1)
-		c.Stop()
+		a.QueueUpdateDraw(c.Stop)
 	}
 
 	count, maxConnRetry := atomic.LoadInt32(&a.conRetry), a.Config.K9s.MaxConnRetry
@@ -421,7 +441,8 @@ func (a *App) refreshCluster(context.Context) error {
 			slogs.MaxRetries, maxConnRetry,
 		)
 		ExitStatus = fmt.Sprintf("Lost K8s connection (%d). Bailing out!", count)
-		a.BailOut(1)
+		a.QueueUpdate(func() { a.BailOut(1) })
+		return fmt.Errorf("conn check failed (%d/%d)", count, maxConnRetry)
 	}
 	if count > 0 {
 		a.Status(model.FlashWarn, fmt.Sprintf("Dial K8s Toast [%d/%d]", count, maxConnRetry))
@@ -542,6 +563,11 @@ func (a *App) BailOut(exitCode int) {
 
 	a.stopImgScanner()
 	a.factory.Terminate()
+	if ExitStatus != "" {
+		// Restore the terminal first so the reason is actually visible.
+		a.App.Stop()
+		fmt.Fprintln(ui.RealStderr(), ExitStatus)
+	}
 	a.App.BailOut(exitCode)
 }
 
@@ -566,11 +592,24 @@ func (a *App) Run() error {
 		return err
 	}
 	a.SetRunning(true)
+	// While the TUI draws, keep stray stderr output (e.g. an OIDC exec
+	// plugin printing a login URL) off the screen and surface it instead.
+	ui.SetStderrHandler(a.stderrLine)
+	ui.SetStderrCaptured(true)
+	defer ui.SetStderrCaptured(false)
 	if err := a.Application.Run(); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// stderrLine surfaces captured stderr output, e.g. an auth plugin asking the
+// user to log in through a browser.
+func (a *App) stderrLine(line string) {
+	if u, ok := ui.ExtractURL(line); ok {
+		a.Flash().Warnf("Authentication required, open in a browser: %s", u)
+	}
 }
 
 // Status reports a new app status for display.

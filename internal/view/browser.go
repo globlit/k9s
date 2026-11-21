@@ -754,21 +754,74 @@ func (b *Browser) simpleDelete(selections []string, msg string) {
 		} else {
 			b.app.Flash().Infof("Delete resource %s %s", b.GVR(), selections[0])
 		}
-		for _, sel := range selections {
-			nuker, ok := b.accessor.(dao.Nuker)
-			if !ok {
-				b.app.Flash().Errf("Invalid nuker %T", b.accessor)
-				continue
+		nuker, ok := b.accessor.(dao.Nuker)
+		if !ok {
+			b.app.Flash().Errf("Invalid nuker %T", b.accessor)
+			return
+		}
+		b.deleteAsync(selections, func(ctx context.Context, sel string) error {
+			return nuker.Delete(ctx, sel, nil, dao.DefaultGrace)
+		})
+	}, func() {})
+}
+
+// deleteAsync deletes the selected resources off the UI goroutine, then
+// updates marks and the table. A slow or unreachable API server must not
+// freeze k9s.
+func (b *Browser) deleteAsync(selections []string, del func(context.Context, string) error) {
+	gvr := b.GVR()
+	runAsync(b.defaultContext(), b.app, selections, "delete",
+		func(ctx context.Context, sel string) error {
+			if err := del(ctx, sel); err != nil {
+				return err
 			}
-			if err := nuker.Delete(context.Background(), sel, nil, dao.DefaultGrace); err != nil {
-				b.app.Flash().Errf("Delete failed with `%s", err)
-			} else {
+			if gvr == client.PodGVR {
 				b.app.factory.DeleteForwarder(sel)
 			}
-			b.GetTable().DeleteMark(sel)
+			return nil
+		},
+		func(done []string, errs []error) {
+			for _, sel := range done {
+				b.GetTable().DeleteMark(sel)
+			}
+			if len(errs) == 1 && len(selections) == 1 {
+				b.app.Flash().Errf("Delete failed with `%s", errs[0])
+			}
+			b.refresh()
+		},
+	)
+}
+
+// runAsync applies fn to each selection off the UI goroutine, each call
+// bounded by the API call timeout, then calls done on the UI goroutine with
+// what succeeded and what failed. When several items fail, it flashes a
+// summary naming the verb.
+func runAsync(ctx context.Context, app *App, sels []string, verb string,
+	fn func(context.Context, string) error, done func(succeeded []string, errs []error)) {
+	timeout := app.Conn().Config().CallTimeout()
+	go func() {
+		defer internal.LogPanic(verb)
+		ok := make([]string, 0, len(sels))
+		var errs []error
+		for _, sel := range sels {
+			c, cancel := context.WithTimeout(ctx, timeout)
+			err := fn(c, sel)
+			cancel()
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+			ok = append(ok, sel)
 		}
-		b.refresh()
-	}, func() {})
+		app.QueueUpdateDraw(func() {
+			if len(errs) > 0 && !(len(errs) == 1 && len(sels) == 1) {
+				app.Flash().Errf("%s failed for %d/%d: %s", verb, len(errs), len(sels), errs[0])
+			}
+			if done != nil {
+				done(ok, errs)
+			}
+		})
+	}()
 }
 
 func (b *Browser) resourceDelete(selections []string, msg string) {
@@ -779,19 +832,14 @@ func (b *Browser) resourceDelete(selections []string, msg string) {
 		} else {
 			b.app.Flash().Infof("Delete resource %s %s", b.GVR(), selections[0])
 		}
-		for _, sel := range selections {
-			grace := dao.DefaultGrace
-			if force {
-				grace = dao.ForceGrace
-			}
-			if err := b.GetModel().Delete(b.defaultContext(), sel, propagation, grace); err != nil {
-				b.app.Flash().Errf("Delete failed with `%s", err)
-			} else {
-				b.app.factory.DeleteForwarder(sel)
-			}
-			b.GetTable().DeleteMark(sel)
+		grace := dao.DefaultGrace
+		if force {
+			grace = dao.ForceGrace
 		}
-		b.refresh()
+		m := b.GetModel()
+		b.deleteAsync(selections, func(ctx context.Context, sel string) error {
+			return m.Delete(ctx, sel, propagation, grace)
+		})
 	}
 	d := b.app.Styles.Dialog()
 	dialog.ShowDelete(&d, b.app.Content.Pages, msg, okFn, func() {})

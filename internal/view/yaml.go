@@ -74,16 +74,16 @@ func saveYAML(dir, name, raw string) (string, error) {
 		return "", err
 	}
 
-	fName := fmt.Sprintf("%s--%d.yaml", data.SanitizeFileName(name), time.Now().Unix())
+	fName := fmt.Sprintf("%s--%d.yaml", data.SanitizeFileName(name), time.Now().UnixNano())
 	fpath := filepath.Join(dir, fName)
-	mod := os.O_CREATE | os.O_WRONLY
+	mod := os.O_CREATE | os.O_WRONLY | os.O_TRUNC
 	file, err := os.OpenFile(fpath, mod, 0600)
 	if err != nil {
 		slog.Error("Unable to open YAML file",
 			slogs.Path, fpath,
 			slogs.Error, err,
 		)
-		return "", nil
+		return "", err
 	}
 	defer func() {
 		if err := file.Close(); err != nil {

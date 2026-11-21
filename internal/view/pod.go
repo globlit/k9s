@@ -307,7 +307,6 @@ func (p *Pod) transferCmd(*tcell.EventKey) *tcell.EventKey {
 			strings.TrimSpace(args.From),
 			strings.TrimSpace(args.To),
 			fmt.Sprintf("--no-preserve=%t", args.NoPreserve),
-			fmt.Sprintf("--retries=%d", args.Retries),
 		)
 		if args.CO != "" {
 			opts = append(opts, "-c="+args.CO)
@@ -324,11 +323,19 @@ func (p *Pod) transferCmd(*tcell.EventKey) *tcell.EventKey {
 		}
 
 		fqn := path + ":" + args.CO
-		if err := runK(p.App(), &cliOpts); err != nil {
-			p.App().cowCmd(err.Error())
-		} else {
-			p.App().Flash().Infof("%s successful on %s!", op, fqn)
-		}
+		// Transfers can take minutes: never block the UI goroutine on them.
+		p.App().Flash().Infof("%s started on %s...", op, fqn)
+		go func() {
+			defer internal.LogPanic("transfer")
+			err := runK(p.App(), &cliOpts)
+			p.App().QueueUpdateDraw(func() {
+				if err != nil {
+					p.App().cowCmd(err.Error())
+					return
+				}
+				p.App().Flash().Infof("%s successful on %s!", op, fqn)
+			})
+		}()
 		return true
 	}
 
