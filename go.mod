@@ -426,4 +426,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.2 // indirect
 )
 
-replace github.com/derailed/tview => github.com/globlit/tview v0.0.0-20261121095936-a04e0bfdf79d
+replace github.com/derailed/tview => github.com/globlit/tview v0.0.0-20261121100149-06a2679c7e18
