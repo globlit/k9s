@@ -84,11 +84,12 @@ func TestChartHealthy(t *testing.T) {
 }
 
 func TestChartHealthyValue(t *testing.T) {
-	t.Skip("bug: Chart.Healthy dereferences nil when given a ReleaseRes value, the type the DAO lists")
-
 	var c helm.Chart
 	assert.NotPanics(t, func() {
-		_ = c.Healthy(context.Background(), newRelease(release.StatusDeployed, 1))
+		require.NoError(t, c.Healthy(context.Background(), newRelease(release.StatusDeployed, 1)))
+		require.Error(t, c.Healthy(context.Background(), newRelease(release.StatusFailed, 1)))
+		require.Error(t, c.Healthy(context.Background(), helm.ReleaseRes{}))
+		require.Error(t, c.Healthy(context.Background(), "zorg"))
 	})
 }
 

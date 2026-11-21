@@ -74,9 +74,16 @@ func (c Chart) Render(o any, _ string, r *model1.Row) error {
 
 // Healthy checks component health.
 func (c Chart) Healthy(_ context.Context, o any) error {
-	h, ok := o.(*ReleaseRes)
-	if !ok {
-		slog.Error("Expected *ReleaseRes, but got", slogs.Type, fmt.Sprintf("%T", o))
+	var h *ReleaseRes
+	switch r := o.(type) {
+	case ReleaseRes:
+		h = &r
+	case *ReleaseRes:
+		h = r
+	}
+	if h == nil || h.Release == nil || h.Release.Info == nil {
+		slog.Error("Expected ReleaseRes, but got", slogs.Type, fmt.Sprintf("%T", o))
+		return fmt.Errorf("expected ReleaseRes, but got %T", o)
 	}
 
 	return c.diagnose(h.Release.Info.Status.String())
