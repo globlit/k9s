@@ -4,7 +4,7 @@
 
 ## Notes
 
-K9s Reloaded is a fork of [derailed/k9s](https://github.com/derailed/k9s), built on its own [tview](https://github.com/globlit/tview) and [tcell](https://github.com/globlit/tcell) forks.
+K9s Reloaded is a fork of [derailed/k9s](https://github.com/derailed/k9s).
 
 Please grab the latest rev and report any issues!
 
@@ -21,14 +21,14 @@ Please grab the latest rev and report any issues!
 
 ## OIDC Login Prompts
 
-Exec credential plugins (kubelogin/OIDC) used to print login URLs straight onto the TUI.
-K9s now captures their output: it shows in the flash bar and the log while the TUI is active, and passes through to the terminal while a shell owns it.
+Exec credential plugins (kubelogin/OIDC) used to print login URLs straight onto the TUI. K9s now captures their output, which avoid text dpilling on the UI!
 
 ---
 
 ## Native FluxCD Actions
 
-No `flux` CLI required. Actions apply to all marked resources.
+New native fluxCD actions are now IN! THe community plugin is not necessary, and you dont need to install any CLI, everything uses annotations and CR statuses to mark resources for reconciliation, suspend/resume etc. 
+
 
 | Key       | Action              |
 |-----------|---------------------|
@@ -38,7 +38,6 @@ No `flux` CLI required. Actions apply to all marked resources.
 | `Shift-F` | Force/Reset         |
 | `Shift-Z` | Jump Source         |
 
-The community `plugins/flux.yaml` now only carries `trace` and `list suspended`.
 
 ---
 
@@ -47,6 +46,7 @@ The community `plugins/flux.yaml` now only carries `trace` and `list suspended`.
 Vulnerability scans persist across sessions in `$XDG_CACHE_HOME/k9s/vul-scans`.
 Restarts reuse results without pulling images. After a vulnerability DB update, k9s re-matches cached SBOMs instead of re-scanning.
 Packages without a version are skipped, as in the grype CLI.
+THis improve overall scan performance :)
 
 ---
 
