@@ -634,7 +634,7 @@ func (p *Pod) Sanitize(ctx context.Context, ns string) (int, error) {
 			// !!BOZO!! Might need to bump timeout otherwise rev limit if too many??
 			fqn := client.FQN(pod.Namespace, pod.Name)
 			slog.Debug("Sanitizing resource", slogs.FQN, fqn)
-			if err := p.Delete(ctx, fqn, nil, 0); err != nil {
+			if err := p.Delete(ctx, fqn, nil, DefaultGrace); err != nil {
 				slog.Debug("Aborted! Sanitizer delete failed",
 					slogs.FQN, fqn,
 					slogs.Count, count,
