@@ -1,0 +1,49 @@
+ Context: fake [RW]                                <0> all       <a>       Attach       <ctrl-k>  Kill            <o> Show Node        ____  __ ________
+ Cluster: fake                                     <1> default   <ctrl-d>  Delete       <l>       Logs            <f> Show PortForward|    |/  /   __   \______
+ User:    fake                                                   <d>       Describe     <p>       Logs Previous   <t> Transfer        |       /\____    /  ___/
+ K9s Rev: v0.0.0                                                 <e>       Edit         <shift-f> Port-Forward    <w> Warp To Namespac|    \   \  /    /\___  \
+ K8s Rev: v1.37.2                                                <?>       Help         <z>       Sanitize        <y> YAML            |____|\__ \/____//____  /
+ CPU:     n/a                                                    <shift-j> Jump Owner   <s>       Shell                                        \/           \/
+ MEM:     n/a
+┌──────────────────────────────────────────────────────────────────────── pods(all)[5] ────────────────────────────────────────────────────────────────────────┐
+│ NAMESPACE↑          NAME                   PF          READY          STATUS                     RESTARTS IP                 NODE             AGE            │
+│ ns-a                api-0                  ●           1/1            Running                           0 10.0.0.1           node-1           3d             │
+│ ns-a                web-7d9-aaaaa          ●           2/2            Running                           0 10.0.0.1           node-1           10d            │
+│ ns-a                web-7d9-bbbbb          ●           2/2            Running                           0 10.0.0.1           node-1           9d             │
+│ ns-b                cache-0                ●           1/1            Running                           0 10.0.0.1           node-1           5d             │
+│ ns-b                db-0                   ●           1/1            Running                           0 10.0.0.1           node-1           30d            │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                  ┌────────────────────────<error>────────────────────────┐                                                   │
+│                                                  │                                                       │                                                   │
+│                                                  │         < Ruroh? `bogus` command not found >          │                                                   │
+│                                                  │                 \   ^__^                              │                                                   │
+│                                                  │                  \  (oo)\_______                      │                                                   │
+│                                                  │                     (__)\       )\/\                  │                                                   │
+│                                                  │                         ||----w |                     │                                                   │
+│                                                  │                         ||     ||                     │                                                   │
+│                                                  │                                                       │                                                   │
+│                                                  │                        Dismiss                        │                                                   │
+│                                                  │                                                       │                                                   │
+│                                                  └───────────────────────────────────────────────────────┘                                                   │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+  <pod>
