@@ -7,6 +7,7 @@ package fakecluster
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -16,6 +17,7 @@ import (
 	"github.com/globlit/k9s/internal/client"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -245,6 +247,8 @@ func (c *Cluster) build() {
 		c.typed.PrependReactor("*", "*", f.reaction)
 		c.dyn.PrependReactor("*", "*", f.reaction)
 	}
+	c.typed.PrependReactor("*", "*", c.rbacReaction)
+	c.dyn.PrependReactor("*", "*", c.rbacReaction)
 	c.typed.PrependReactor("*", "*", c.record(SourceTyped))
 	c.dyn.PrependReactor("*", "*", c.record(SourceDyn))
 }
@@ -313,7 +317,9 @@ func (c *Cluster) add(o runtime.Object) error {
 	if typed == nil {
 		return nil
 	}
-	if err := c.typed.Tracker().Create(r.gvr(), typed, u.GetNamespace()); err != nil && !apierrors.IsAlreadyExists(err) {
+	// Skip kinds that the typed fake does not serve, such as CRDs.
+	err := c.typed.Tracker().Create(r.gvr(), typed, u.GetNamespace())
+	if err != nil && !apierrors.IsAlreadyExists(err) && !meta.IsNoMatchError(err) {
 		return err
 	}
 
@@ -379,6 +385,21 @@ func (c *Cluster) allowed(ns string, gvr *client.GVR, name, verb string) bool {
 	}
 
 	return true
+}
+
+// Return Forbidden when a policy denies the call, as an API server does.
+func (c *Cluster) rbacReaction(a k8stesting.Action) (bool, runtime.Object, error) {
+	r := a.GetResource()
+	gvr := client.NewGVR(path.Join(r.Group, r.Version, r.Resource))
+	var name string
+	if na, ok := a.(interface{ GetName() string }); ok {
+		name = na.GetName()
+	}
+	if c.allowed(a.GetNamespace(), gvr, name, a.GetVerb()) {
+		return false, nil, nil
+	}
+
+	return true, nil, apierrors.NewForbidden(r.GroupResource(), name, fmt.Errorf("denied by policy"))
 }
 
 func (c *Cluster) mirrorReaction(a k8stesting.Action) (bool, runtime.Object, error) {
