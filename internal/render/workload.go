@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal/model1"
+	"github.com/globlit/tcell/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"

@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal"
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/model"
@@ -18,6 +17,7 @@ import (
 	"github.com/globlit/k9s/internal/slogs"
 	"github.com/globlit/k9s/internal/ui"
 	"github.com/globlit/k9s/internal/view/cmd"
+	"github.com/globlit/tcell/v2"
 )
 
 // Table represents a table viewer.

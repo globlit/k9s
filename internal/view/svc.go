@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/config"
 	"github.com/globlit/k9s/internal/dao"
@@ -19,6 +18,7 @@ import (
 	"github.com/globlit/k9s/internal/render"
 	"github.com/globlit/k9s/internal/slogs"
 	"github.com/globlit/k9s/internal/ui"
+	"github.com/globlit/tcell/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"

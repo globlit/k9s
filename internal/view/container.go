@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal"
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/dao"
@@ -16,6 +15,7 @@ import (
 	"github.com/globlit/k9s/internal/port"
 	"github.com/globlit/k9s/internal/render"
 	"github.com/globlit/k9s/internal/ui"
+	"github.com/globlit/tcell/v2"
 	v1 "k8s.io/api/core/v1"
 )
 

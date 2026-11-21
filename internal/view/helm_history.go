@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal"
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/dao"
@@ -16,6 +15,7 @@ import (
 	"github.com/globlit/k9s/internal/render/helm"
 	"github.com/globlit/k9s/internal/ui"
 	"github.com/globlit/k9s/internal/ui/dialog"
+	"github.com/globlit/tcell/v2"
 )
 
 // History represents a helm History view.

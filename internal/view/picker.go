@@ -7,10 +7,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal/model"
 	"github.com/globlit/k9s/internal/ui"
 	"github.com/globlit/k9s/internal/view/cmd"
+	"github.com/globlit/tcell/v2"
 	"github.com/globlit/tview"
 	"k8s.io/apimachinery/pkg/labels"
 )

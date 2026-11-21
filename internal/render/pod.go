@@ -10,11 +10,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/config"
 	"github.com/globlit/k9s/internal/model1"
 	"github.com/globlit/k9s/internal/slogs"
+	"github.com/globlit/tcell/v2"
 	"github.com/globlit/tview"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"

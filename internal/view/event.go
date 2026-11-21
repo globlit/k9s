@@ -4,9 +4,9 @@
 package view
 
 import (
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/ui"
+	"github.com/globlit/tcell/v2"
 )
 
 const faultsFilter = "Warning|Error"

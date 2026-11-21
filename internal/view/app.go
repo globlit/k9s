@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal"
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/config"
@@ -27,6 +26,7 @@ import (
 	"github.com/globlit/k9s/internal/view/cmd"
 	"github.com/globlit/k9s/internal/vul"
 	"github.com/globlit/k9s/internal/watch"
+	"github.com/globlit/tcell/v2"
 	"github.com/globlit/tview"
 )
 

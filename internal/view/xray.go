@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal"
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/config"
@@ -21,6 +20,7 @@ import (
 	"github.com/globlit/k9s/internal/ui/dialog"
 	"github.com/globlit/k9s/internal/view/cmd"
 	"github.com/globlit/k9s/internal/xray"
+	"github.com/globlit/tcell/v2"
 	"github.com/globlit/tview"
 	"github.com/sahilm/fuzzy"
 	"golang.org/x/text/cases"

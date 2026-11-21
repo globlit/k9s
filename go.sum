@@ -365,8 +365,6 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/deitch/magic v1.0.0 h1:Nma1YAj7EB8Mlv4pVhbPpUp0CV1luYj2NOnE2+2xPNE=
 github.com/deitch/magic v1.0.0/go.mod h1:B3tI9iGHi4imdLi4Asdha1Sc6feLMTfPLXh9IUYmysk=
-github.com/derailed/tcell/v2 v2.3.1-rc.4 h1:hrBFOQjcmt1I86Cvcq/NKP7sdRHH+6ibXWBFl0Hn3jY=
-github.com/derailed/tcell/v2 v2.3.1-rc.4/go.mod h1:nf68BEL8fjmXQHJT3xZjoZFs2uXOzyJcNAQqGUEMrFY=
 github.com/dgrijalva/jwt-go/v4 v4.0.0-preview1/go.mod h1:+hnT3ywWDTAFrW5aE+u2Sa/wT555ZqwoCS+pk3p6ry4=
 github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f h1:lO4WD4F/rVNCu3HqELle0jiPLLBs70cWOduZpkS1E78=
 github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f/go.mod h1:cuUVRXasLTGF7a8hSLbxyZXjz+1KgoB3wDUb6vlszIc=
@@ -485,8 +483,10 @@ github.com/glebarez/sqlite v1.11.0 h1:wSG0irqzP6VurnMEpFGer5Li19RpIRi2qvQz++w0GM
 github.com/glebarez/sqlite v1.11.0/go.mod h1:h8/o8j5wiAsqSPoWELDUdJXhjAhsVliSn7bWZjOhrgQ=
 github.com/gliderlabs/ssh v0.3.8 h1:a4YXD1V7xMF9g5nTkdfnja3Sxy1PVDCj1Zg4Wb8vY6c=
 github.com/gliderlabs/ssh v0.3.8/go.mod h1:xYoytBv1sV0aL3CavoDuJIQNURXkkfPA/wxQ1pL1fAU=
-github.com/globlit/tview v0.0.0-20261121101100-1cffd0d1473a h1:wgqmGnx/fcxLVLK9vPR/j2kTi+Z8eEArPSfEnWHidBk=
-github.com/globlit/tview v0.0.0-20261121101100-1cffd0d1473a/go.mod h1:CXWrdfec7dmezF/tJMH4BPCPIArlDFwFUVv/qJ3VAcw=
+github.com/globlit/tcell/v2 v2.0.0-20261121103249-7b8a3cd77498 h1:kLlOCgfNNXDmtWK1e1yHOSRjBNxQiJZxr+omuBD7Urw=
+github.com/globlit/tcell/v2 v2.0.0-20261121103249-7b8a3cd77498/go.mod h1:fIZuVpEOzVc+QzpQAVTkiEBUYWqTcPoVn2VhOuqcKnQ=
+github.com/globlit/tview v0.0.0-20261121103334-3177622f3a47 h1:JwZ+/O70SeMzjND8soYLTGuPVR3XM3VKjoYEgOUCpx8=
+github.com/globlit/tview v0.0.0-20261121103334-3177622f3a47/go.mod h1:Ckhicht5dP0cTSBGWWDghjzIxXdl7szoxkSivJb4dCM=
 github.com/go-errors/errors v1.5.1 h1:ZwEMSLRCapFLflTpT7NKaAc7ukJ8ZPEjzlxt8rPN8bk=
 github.com/go-errors/errors v1.5.1/go.mod h1:sIVyrIiJhuEF+Pj9Ebtd6P/rEYROXFi3BopGUQ5a5Og=
 github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 h1:+zs/tPmkDkHx3U66DAb0lQFJrpS6731Oaa12ikc+DiI=

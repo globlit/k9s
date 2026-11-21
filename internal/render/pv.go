@@ -8,9 +8,9 @@ import (
 	"path"
 	"strings"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/model1"
+	"github.com/globlit/tcell/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"

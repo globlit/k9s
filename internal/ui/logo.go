@@ -9,8 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal/config"
+	"github.com/globlit/tcell/v2"
 	"github.com/globlit/tview"
 )
 

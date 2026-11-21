@@ -6,8 +6,8 @@ package config_test
 import (
 	"testing"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal/config"
+	"github.com/globlit/tcell/v2"
 	"github.com/globlit/tview"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

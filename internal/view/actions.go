@@ -10,11 +10,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal/config"
 	"github.com/globlit/k9s/internal/slogs"
 	"github.com/globlit/k9s/internal/ui"
 	"github.com/globlit/k9s/internal/ui/dialog"
+	"github.com/globlit/tcell/v2"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 

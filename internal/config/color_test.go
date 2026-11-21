@@ -7,8 +7,8 @@ import (
 	"math"
 	"testing"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal/config"
+	"github.com/globlit/tcell/v2"
 	"github.com/lucasb-eyer/go-colorful"
 	"github.com/stretchr/testify/assert"
 )

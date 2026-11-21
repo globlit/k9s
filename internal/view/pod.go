@@ -12,7 +12,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/fatih/color"
 	"github.com/globlit/k9s/internal"
 	"github.com/globlit/k9s/internal/client"
@@ -23,6 +22,7 @@ import (
 	"github.com/globlit/k9s/internal/slogs"
 	"github.com/globlit/k9s/internal/ui"
 	"github.com/globlit/k9s/internal/ui/dialog"
+	"github.com/globlit/tcell/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

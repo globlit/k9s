@@ -9,11 +9,11 @@ require (
 	github.com/anchore/syft v1.57.0
 	github.com/atotto/clipboard v0.1.4
 	github.com/cenkalti/backoff/v4 v4.3.0
-	github.com/derailed/tcell/v2 v2.3.1-rc.4
 	github.com/fatih/color v1.19.0
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/fvbommel/sortorder v1.2.1
-	github.com/globlit/tview v0.0.0-20261121101100-1cffd0d1473a
+	github.com/globlit/tcell/v2 v2.0.0-20261121103249-7b8a3cd77498
+	github.com/globlit/tview v0.0.0-20261121103334-3177622f3a47
 	github.com/go-errors/errors v1.5.1
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/itchyny/gojq v0.12.20

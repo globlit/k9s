@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal"
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/config"
@@ -18,6 +17,7 @@ import (
 	"github.com/globlit/k9s/internal/model1"
 	"github.com/globlit/k9s/internal/ui"
 	"github.com/globlit/k9s/internal/view"
+	"github.com/globlit/tcell/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

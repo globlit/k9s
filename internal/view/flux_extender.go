@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal"
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/dao"
 	"github.com/globlit/k9s/internal/ui"
 	"github.com/globlit/k9s/internal/ui/dialog"
+	"github.com/globlit/tcell/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"

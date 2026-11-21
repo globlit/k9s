@@ -4,10 +4,10 @@
 package view
 
 import (
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/dao"
 	"github.com/globlit/k9s/internal/ui"
+	"github.com/globlit/tcell/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

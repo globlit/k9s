@@ -8,11 +8,11 @@ import (
 	"os"
 	"sync"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/config"
 	"github.com/globlit/k9s/internal/model"
 	"github.com/globlit/k9s/internal/slogs"
+	"github.com/globlit/tcell/v2"
 	"github.com/globlit/tview"
 )
 

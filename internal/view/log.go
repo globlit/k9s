@@ -15,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/color"
 	"github.com/globlit/k9s/internal/config"
@@ -25,6 +24,7 @@ import (
 	"github.com/globlit/k9s/internal/slogs"
 	"github.com/globlit/k9s/internal/ui"
 	"github.com/globlit/k9s/internal/view/cmd"
+	"github.com/globlit/tcell/v2"
 	"github.com/globlit/tview"
 	"k8s.io/apimachinery/pkg/labels"
 )

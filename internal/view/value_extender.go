@@ -7,12 +7,12 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal"
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/model"
 	"github.com/globlit/k9s/internal/slogs"
 	"github.com/globlit/k9s/internal/ui"
+	"github.com/globlit/tcell/v2"
 )
 
 // ValueExtender adds values actions to a given viewer.

@@ -6,10 +6,10 @@ package view
 import (
 	"context"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal/config"
 	"github.com/globlit/k9s/internal/model"
 	"github.com/globlit/k9s/internal/ui"
+	"github.com/globlit/tcell/v2"
 	"github.com/globlit/tview"
 )
 

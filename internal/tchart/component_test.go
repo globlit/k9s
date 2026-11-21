@@ -3,8 +3,8 @@ package tchart_test
 import (
 	"testing"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal/tchart"
+	"github.com/globlit/tcell/v2"
 	"github.com/stretchr/testify/assert"
 )
 

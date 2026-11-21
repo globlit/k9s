@@ -4,7 +4,7 @@ import (
 	"image"
 	"sync"
 
-	"github.com/derailed/tcell/v2"
+	"github.com/globlit/tcell/v2"
 	"github.com/globlit/tview"
 )
 

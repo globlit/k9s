@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/derailed/tcell/v2"
 	"github.com/globlit/k9s/internal"
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/config"
@@ -18,6 +17,7 @@ import (
 	"github.com/globlit/k9s/internal/render"
 	"github.com/globlit/k9s/internal/slogs"
 	"github.com/globlit/k9s/internal/vul"
+	"github.com/globlit/tcell/v2"
 	"github.com/globlit/tview"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
