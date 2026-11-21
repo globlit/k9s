@@ -4,7 +4,6 @@
 package ui
 
 import (
-	"os"
 	"testing"
 
 	"github.com/derailed/k9s/internal/config"
@@ -15,7 +14,7 @@ import (
 )
 
 func Test_activeConfig(t *testing.T) {
-	require.NoError(t, os.Setenv(config.K9sEnvConfigDir, "/tmp/test-config"))
+	t.Setenv(config.K9sEnvConfigDir, t.TempDir())
 	require.NoError(t, config.InitLocs())
 
 	cl, ct := "cl-1", "ct-1-1"

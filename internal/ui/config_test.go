@@ -64,13 +64,13 @@ func TestSkinnedContext(t *testing.T) {
 }
 
 func TestBenchConfig(t *testing.T) {
-	require.NoError(t, os.Setenv(config.K9sEnvConfigDir, "/tmp/test-config"))
+	dir := t.TempDir()
+	t.Setenv(config.K9sEnvConfigDir, dir)
 	require.NoError(t, config.InitLocs())
-	defer require.NoError(t, os.RemoveAll(config.K9sEnvConfigDir))
 
 	bc, err := config.EnsureBenchmarksCfgFile("cl-1", "ct-1")
 	require.NoError(t, err)
-	assert.Equal(t, "/tmp/test-config/clusters/cl-1/ct-1/benchmarks.yaml", bc)
+	assert.Equal(t, filepath.Join(dir, "clusters/cl-1/ct-1/benchmarks.yaml"), bc)
 }
 
 // Helpers...

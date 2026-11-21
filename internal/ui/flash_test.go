@@ -4,7 +4,6 @@
 package ui_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -28,15 +27,20 @@ func TestFlash(t *testing.T) {
 	a := ui.NewApp(mock.NewMockConfig(t), "test")
 	f := ui.NewFlash(a)
 	f.SetTestMode(true)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go f.Watch(ctx, a.Flash().Channel())
+	c := a.Flash().Channel()
 
 	for k := range uu {
 		u := uu[k]
 		t.Run(k, func(t *testing.T) {
 			a.Flash().SetMessage(u.l, u.i)
-			time.Sleep(delay)
+			// Apply the message on the test goroutine: tview widgets are not
+			// safe for concurrent access.
+			select {
+			case msg := <-c:
+				f.SetMessage(msg)
+			case <-time.After(delay * 10):
+				t.Fatal("no flash message received")
+			}
 			assert.Equal(t, u.e, f.GetText(false))
 		})
 	}

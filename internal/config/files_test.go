@@ -61,12 +61,12 @@ func TestInitLogLoc(t *testing.T) {
 }
 
 func TestEnsureBenchmarkCfg(t *testing.T) {
-	require.NoError(t, os.Setenv(config.K9sEnvConfigDir, "/tmp/test-config"))
+	dir := t.TempDir()
+	t.Setenv(config.K9sEnvConfigDir, dir)
 	require.NoError(t, config.InitLocs())
-	defer require.NoError(t, os.RemoveAll("/tmp/test-config"))
 
-	require.NoError(t, data.EnsureFullPath("/tmp/test-config/clusters/cl-1/ct-2", data.DefaultDirMod))
-	require.NoError(t, os.WriteFile("/tmp/test-config/clusters/cl-1/ct-2/benchmarks.yaml", []byte{}, data.DefaultFileMod))
+	require.NoError(t, data.EnsureFullPath(filepath.Join(dir, "clusters/cl-1/ct-2"), data.DefaultDirMod))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "clusters/cl-1/ct-2/benchmarks.yaml"), []byte{}, data.DefaultFileMod))
 
 	uu := map[string]struct {
 		cluster, context string
@@ -75,13 +75,13 @@ func TestEnsureBenchmarkCfg(t *testing.T) {
 		"not-exist": {
 			cluster: "cl-1",
 			context: "ct-1",
-			f:       "/tmp/test-config/clusters/cl-1/ct-1/benchmarks.yaml",
+			f:       "clusters/cl-1/ct-1/benchmarks.yaml",
 			e:       "benchmarks:\n  defaults:\n    concurrency: 2\n    requests: 200",
 		},
 		"exist": {
 			cluster: "cl-1",
 			context: "ct-2",
-			f:       "/tmp/test-config/clusters/cl-1/ct-2/benchmarks.yaml",
+			f:       "clusters/cl-1/ct-2/benchmarks.yaml",
 		},
 	}
 
@@ -90,7 +90,7 @@ func TestEnsureBenchmarkCfg(t *testing.T) {
 		t.Run(k, func(t *testing.T) {
 			f, err := config.EnsureBenchmarksCfgFile(u.cluster, u.context)
 			require.NoError(t, err)
-			assert.Equal(t, u.f, f)
+			assert.Equal(t, filepath.Join(dir, u.f), f)
 			bb, err := os.ReadFile(f)
 			require.NoError(t, err)
 			assert.Equal(t, u.e, string(bb))
