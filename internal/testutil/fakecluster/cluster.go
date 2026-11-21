@@ -16,6 +16,7 @@ import (
 	"github.com/globlit/k9s/internal/client"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -313,7 +314,10 @@ func (c *Cluster) add(o runtime.Object) error {
 	if typed == nil {
 		return nil
 	}
-	if err := c.typed.Tracker().Create(r.gvr(), typed, u.GetNamespace()); err != nil && !apierrors.IsAlreadyExists(err) {
+	// Helm adds the CRD kinds to the client-go scheme, but the typed fake
+	// cannot store them. Keep such objects in the dynamic store only.
+	if err := c.typed.Tracker().Create(r.gvr(), typed, u.GetNamespace()); err != nil &&
+		!apierrors.IsAlreadyExists(err) && !meta.IsNoMatchError(err) {
 		return err
 	}
 
