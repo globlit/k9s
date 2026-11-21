@@ -1,0 +1,4 @@
+go test fuzz v1
+[]byte("é")
+[]byte("\x01")
+int(269)
