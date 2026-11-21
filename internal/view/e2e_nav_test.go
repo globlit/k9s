@@ -92,6 +92,7 @@ func TestE2EDrillDown(t *testing.T) {
 	s.e2eWait("web-7d9-aaaaa", "web-7d9-bbbbb")
 	s.e2eGone("api-0", "db-0")
 	assert.Equal(t, "<deployment> <pod>", s.e2eCrumbs())
+	expect.Match(t, "e2e_deploy_pods.txt", e2eMask(s.Screen()))
 
 	s.Keys(tcell.KeyEscape)
 	s.Eventually(func() bool { return s.TopView() == "Deployment" }, "esc did not go back")
@@ -199,6 +200,14 @@ func TestE2EEveryViewer(t *testing.T) {
 			assert.Equal(t, -1, s.ExitCode())
 		})
 	}
+}
+
+func TestE2EBenchmarksWithoutDir(t *testing.T) {
+	t.Skip("bug: the benchmarks view does not create its dir, so a new user sees a watcher error")
+	s := NewSimApp(t, e2eCluster(t))
+	s.e2eGoto(":bench", "Benchmarks")
+
+	assert.DirExists(t, benchDir(s.App().Config))
 }
 
 func TestE2ENamespaceSwitch(t *testing.T) {

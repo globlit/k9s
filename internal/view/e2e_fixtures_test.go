@@ -4,6 +4,7 @@
 package view
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -140,15 +141,17 @@ func e2eCluster(t testing.TB, opts ...fakecluster.Option) *fakecluster.Cluster {
 	return fakecluster.New(t, oo...)
 }
 
-// e2eMask returns the screen text without the flash row, which changes
-// with time.
+var e2eTimeRX = regexp.MustCompile(`\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z`)
+
+// e2eMask returns the screen text without the flash row and timestamps,
+// which change with time.
 func e2eMask(scr string) string {
 	ll := strings.Split(strings.TrimRight(scr, "\n"), "\n")
 	if len(ll) > 0 {
 		ll = ll[:len(ll)-1]
 	}
 
-	return strings.Join(ll, "\n") + "\n"
+	return e2eTimeRX.ReplaceAllString(strings.Join(ll, "\n"), "<time>") + "\n"
 }
 
 // e2eWait waits until the screen contains all ss.
