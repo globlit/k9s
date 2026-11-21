@@ -24,6 +24,9 @@ default: help
 test:                    ## Run all tests
 	@go clean --testcache && go test ./...
 
+test-race:               ## Run all tests with the race detector
+	@CGO_ENABLED=1 go test -race -count=1 ./...
+
 lint:                    ## Run golangci-lint
 	@command -v golangci-lint >/dev/null 2>&1 || go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
 	@golangci-lint run
@@ -35,7 +38,7 @@ cover:                   ## Run test coverage suite
 build:                   ## Builds the CLI
 	@CGO_ENABLED=${CGO_ENABLED} go build ${GO_FLAGS} \
 	-ldflags "-w -s -X ${PACKAGE}/cmd.version=${VERSION} -X ${PACKAGE}/cmd.commit=${GIT_REV} -X ${PACKAGE}/cmd.date=${DATE}" \
-	-a -tags=${GO_TAGS} -o ${OUTPUT_BIN} main.go
+	-trimpath -tags=${GO_TAGS} -o ${OUTPUT_BIN} main.go
 
 kubectl-stable-version:  ## Get kubectl latest stable version
 	@curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt
