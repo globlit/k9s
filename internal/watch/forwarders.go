@@ -58,6 +58,16 @@ func NewForwarders() Forwarders {
 	return make(map[string]Forwarder)
 }
 
+// Clone returns a shallow copy of the forwarders.
+func (ff Forwarders) Clone() Forwarders {
+	c := make(Forwarders, len(ff))
+	for k, v := range ff {
+		c[k] = v
+	}
+
+	return c
+}
+
 // IsPodForwarded checks if pod has a forward.
 func (ff Forwarders) IsPodForwarded(fqn string) bool {
 	fqn += "|"
