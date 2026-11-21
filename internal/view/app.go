@@ -202,7 +202,7 @@ func (a *App) initSignals() {
 			// Event loop idle, e.g. suspended.
 			slog.Warn("Forced exit: UI did not shut down in time")
 			ui.RunExitHooks()
-			os.Exit(0)
+			ui.Exit(0)
 		}
 	}()
 }

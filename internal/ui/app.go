@@ -5,7 +5,6 @@ package ui
 
 import (
 	"log/slog"
-	"os"
 	"sync"
 
 	"github.com/globlit/k9s/internal/client"
@@ -158,7 +157,7 @@ func (a *App) BailOut(exitCode int) {
 
 	a.Stop()
 	RunExitHooks()
-	os.Exit(exitCode)
+	Exit(exitCode)
 }
 
 // ResetPrompt reset the prompt model and marks buffer as active.

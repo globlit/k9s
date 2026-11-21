@@ -3,12 +3,32 @@
 
 package ui
 
-import "sync"
+import (
+	"os"
+	"sync"
+	"sync/atomic"
+)
 
 var (
 	exitHooksMx sync.Mutex
 	exitHooks   []func()
+	exitFn      atomic.Pointer[func(int)]
 )
+
+// Exit ends the process with code, through the exit func.
+func Exit(code int) {
+	if f := exitFn.Load(); f != nil {
+		(*f)(code)
+		return
+	}
+	os.Exit(code)
+}
+
+// SetExitFunc replaces os.Exit for tests. Call the returned func to restore it.
+func SetExitFunc(f func(int)) func() {
+	old := exitFn.Swap(&f)
+	return func() { exitFn.Store(old) }
+}
 
 // OnExit registers f to run on BailOut: os.Exit skips deferred calls.
 func OnExit(f func()) {
