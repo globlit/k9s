@@ -31,7 +31,6 @@ var (
 	metricsVerbs = metav1.Verbs{"get", "list"}
 )
 
-// coreEventGVR is the legacy core events resource.
 var coreEventGVR = client.NewGVR("v1/events")
 
 func builtins() []Resource {
@@ -80,7 +79,6 @@ func (r Resource) verbs() metav1.Verbs {
 	return allVerbs
 }
 
-// discoveryLists groups resources per group version for discovery.
 func discoveryLists(rr []Resource) []*metav1.APIResourceList {
 	var (
 		order []string
