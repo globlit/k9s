@@ -1,13 +1,13 @@
 NAME            := k9s
 VERSION         ?= v0.51.0
-PACKAGE         := github.com/derailed/$(NAME)
+PACKAGE         := github.com/globlit/$(NAME)
 OUTPUT_BIN      ?= execs/${NAME}
 GO_FLAGS        ?=
 GO_TAGS	        ?= netgo
 CGO_ENABLED     ?=0
 GIT_REV         ?= $(shell git rev-parse --short HEAD)
 
-IMG_NAME        := derailed/k9s
+IMG_NAME        := globlit/k9s
 IMAGE           := ${IMG_NAME}:${VERSION}
 IMAGE_LATEST    := ${IMG_NAME}:latest
 BUILD_PLATFORMS ?= linux/amd64,linux/arm64

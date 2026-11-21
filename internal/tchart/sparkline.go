@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/derailed/tcell/v2"
-	"github.com/derailed/tview"
+	"github.com/globlit/tview"
 )
 
 var sparks = []rune{'▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}

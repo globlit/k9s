@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/derailed/k9s/internal/model1"
 	"github.com/derailed/tcell/v2"
+	"github.com/globlit/k9s/internal/model1"
 )
 
 // HorizontalPodAutoscaler renders a K8s HorizontalPodAutoscaler to screen.

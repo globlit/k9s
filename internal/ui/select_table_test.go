@@ -6,7 +6,7 @@ package ui
 import (
 	"testing"
 
-	"github.com/derailed/tview"
+	"github.com/globlit/tview"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/util/sets"
 )

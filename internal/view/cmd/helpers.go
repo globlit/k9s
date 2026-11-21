@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/derailed/k9s/internal/client"
+	"github.com/globlit/k9s/internal/client"
 )
 
 // ToLabels converts a string into a map of labels.

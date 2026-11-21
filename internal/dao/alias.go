@@ -10,10 +10,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/derailed/k9s/internal"
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/config"
-	"github.com/derailed/k9s/internal/render"
+	"github.com/globlit/k9s/internal"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/config"
+	"github.com/globlit/k9s/internal/render"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 )

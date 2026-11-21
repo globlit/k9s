@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/derailed/k9s/internal"
+	"github.com/globlit/k9s/internal"
 )
 
 const (

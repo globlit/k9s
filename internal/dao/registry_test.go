@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/derailed/k9s/internal/client"
+	"github.com/globlit/k9s/internal/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"

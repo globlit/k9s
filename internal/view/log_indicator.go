@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/derailed/k9s/internal/config"
-	"github.com/derailed/tview"
+	"github.com/globlit/k9s/internal/config"
+	"github.com/globlit/tview"
 )
 
 const spacer = "     "

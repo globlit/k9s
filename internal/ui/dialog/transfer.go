@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/derailed/k9s/internal/config"
-	"github.com/derailed/k9s/internal/ui"
-	"github.com/derailed/tview"
+	"github.com/globlit/k9s/internal/config"
+	"github.com/globlit/k9s/internal/ui"
+	"github.com/globlit/tview"
 )
 
 const confirmKey = "confirm"

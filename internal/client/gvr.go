@@ -10,8 +10,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/derailed/k9s/internal/slogs"
 	"github.com/fvbommel/sortorder"
+	"github.com/globlit/k9s/internal/slogs"
 	"gopkg.in/yaml.v3"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

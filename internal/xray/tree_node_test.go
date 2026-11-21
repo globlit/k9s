@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/xray"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/xray"
 	"github.com/stretchr/testify/assert"
 )
 

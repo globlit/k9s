@@ -7,12 +7,12 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/derailed/k9s/internal"
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/config/data"
-	"github.com/derailed/k9s/internal/slogs"
-	"github.com/derailed/k9s/internal/ui"
 	"github.com/derailed/tcell/v2"
+	"github.com/globlit/k9s/internal"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/config/data"
+	"github.com/globlit/k9s/internal/slogs"
+	"github.com/globlit/k9s/internal/ui"
 )
 
 // ScreenDump presents a directory listing viewer.

@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/config"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/config"
 	version "k8s.io/apimachinery/pkg/version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	disk "k8s.io/client-go/discovery/cached/disk"

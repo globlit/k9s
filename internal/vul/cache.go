@@ -21,8 +21,8 @@ import (
 
 	"github.com/anchore/syft/syft/format/syftjson"
 	"github.com/anchore/syft/syft/sbom"
-	"github.com/derailed/k9s/internal/config/data"
-	"github.com/derailed/k9s/internal/slogs"
+	"github.com/globlit/k9s/internal/config/data"
+	"github.com/globlit/k9s/internal/slogs"
 )
 
 const (

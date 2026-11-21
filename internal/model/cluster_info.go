@@ -14,15 +14,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/config"
-	"github.com/derailed/k9s/internal/dao"
-	"github.com/derailed/k9s/internal/slogs"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/config"
+	"github.com/globlit/k9s/internal/dao"
+	"github.com/globlit/k9s/internal/slogs"
 	"k8s.io/apimachinery/pkg/util/cache"
 )
 
 const (
-	k9sGitURL       = "https://api.github.com/repos/derailed/k9s/releases/latest"
+	k9sGitURL       = "https://api.github.com/repos/globlit/k9s/releases/latest"
 	cacheSize       = 10
 	cacheExpiry     = 1 * time.Hour
 	k9sLatestRevKey = "k9sRev"

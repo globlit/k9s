@@ -4,7 +4,7 @@
 package tchart
 
 import (
-	"github.com/derailed/tview"
+	"github.com/globlit/tview"
 )
 
 var dots = []rune{' ', '⠂', '▤', '▥'}

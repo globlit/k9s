@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/config"
-	"github.com/derailed/k9s/internal/config/data"
-	"github.com/derailed/k9s/internal/view/cmd"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/config"
+	"github.com/globlit/k9s/internal/config/data"
+	"github.com/globlit/k9s/internal/view/cmd"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

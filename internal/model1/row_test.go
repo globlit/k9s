@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/derailed/k9s/internal/model1"
+	"github.com/globlit/k9s/internal/model1"
 	"github.com/stretchr/testify/assert"
 )
 

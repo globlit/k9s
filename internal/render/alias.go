@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/model1"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/model1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )

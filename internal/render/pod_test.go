@@ -6,10 +6,10 @@ package render_test
 import (
 	"testing"
 
-	k9scfg "github.com/derailed/k9s/internal/config"
-	"github.com/derailed/k9s/internal/model1"
-	"github.com/derailed/k9s/internal/render"
 	"github.com/derailed/tcell/v2"
+	k9scfg "github.com/globlit/k9s/internal/config"
+	"github.com/globlit/k9s/internal/model1"
+	"github.com/globlit/k9s/internal/render"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"

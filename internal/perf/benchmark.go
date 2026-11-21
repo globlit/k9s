@@ -16,10 +16,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/config"
-	"github.com/derailed/k9s/internal/config/data"
-	"github.com/derailed/k9s/internal/slogs"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/config"
+	"github.com/globlit/k9s/internal/config/data"
+	"github.com/globlit/k9s/internal/slogs"
 	"github.com/rakyll/hey/requester"
 )
 

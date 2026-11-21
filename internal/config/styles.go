@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/derailed/k9s/internal/config/data"
-	"github.com/derailed/k9s/internal/config/json"
 	"github.com/derailed/tcell/v2"
-	"github.com/derailed/tview"
+	"github.com/globlit/k9s/internal/config/data"
+	"github.com/globlit/k9s/internal/config/json"
+	"github.com/globlit/tview"
 	"gopkg.in/yaml.v3"
 )
 

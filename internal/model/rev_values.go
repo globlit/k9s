@@ -10,10 +10,10 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/derailed/k9s/internal"
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/dao"
-	"github.com/derailed/k9s/internal/slogs"
+	"github.com/globlit/k9s/internal"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/dao"
+	"github.com/globlit/k9s/internal/slogs"
 	"github.com/sahilm/fuzzy"
 )
 

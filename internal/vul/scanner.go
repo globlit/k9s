@@ -31,8 +31,8 @@ import (
 	"github.com/anchore/syft/syft"
 	"github.com/anchore/syft/syft/cataloging"
 	"github.com/anchore/syft/syft/sbom"
-	"github.com/derailed/k9s/internal/config"
-	"github.com/derailed/k9s/internal/slogs"
+	"github.com/globlit/k9s/internal/config"
+	"github.com/globlit/k9s/internal/slogs"
 )
 
 var ImgScanner *imageScanner

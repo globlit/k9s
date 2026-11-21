@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/derailed/k9s/internal"
-	"github.com/derailed/k9s/internal/client"
+	"github.com/globlit/k9s/internal"
+	"github.com/globlit/k9s/internal/client"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"

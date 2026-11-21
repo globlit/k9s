@@ -9,8 +9,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/slogs"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/slogs"
 )
 
 const (

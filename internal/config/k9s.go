@@ -17,9 +17,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/config/data"
-	"github.com/derailed/k9s/internal/slogs"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/config/data"
+	"github.com/globlit/k9s/internal/slogs"
 )
 
 type gpuVendors map[string]string

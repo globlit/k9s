@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/derailed/tview"
+	"github.com/globlit/tview"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -4,11 +4,11 @@
 package view
 
 import (
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/config/data"
-	"github.com/derailed/k9s/internal/dao"
-	"github.com/derailed/k9s/internal/ui"
 	"github.com/derailed/tcell/v2"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/config/data"
+	"github.com/globlit/k9s/internal/dao"
+	"github.com/globlit/k9s/internal/ui"
 	"k8s.io/apimachinery/pkg/labels"
 )
 

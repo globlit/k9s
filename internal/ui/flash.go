@@ -7,10 +7,10 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/derailed/k9s/internal/config"
-	"github.com/derailed/k9s/internal/model"
 	"github.com/derailed/tcell/v2"
-	"github.com/derailed/tview"
+	"github.com/globlit/k9s/internal/config"
+	"github.com/globlit/k9s/internal/model"
+	"github.com/globlit/tview"
 )
 
 const (

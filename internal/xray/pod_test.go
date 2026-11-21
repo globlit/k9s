@@ -7,10 +7,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/derailed/k9s/internal"
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/render"
-	"github.com/derailed/k9s/internal/xray"
+	"github.com/globlit/k9s/internal"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/render"
+	"github.com/globlit/k9s/internal/xray"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

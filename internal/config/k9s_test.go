@@ -8,8 +8,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/derailed/k9s/internal/config"
-	"github.com/derailed/k9s/internal/config/mock"
+	"github.com/globlit/k9s/internal/config"
+	"github.com/globlit/k9s/internal/config/mock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/cli-runtime/pkg/genericclioptions"

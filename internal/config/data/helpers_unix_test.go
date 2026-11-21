@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/derailed/k9s/internal/config/data"
+	"github.com/globlit/k9s/internal/config/data"
 	"github.com/stretchr/testify/require"
 )
 

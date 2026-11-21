@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/derailed/k9s/internal"
+	"github.com/globlit/k9s/internal"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -8,10 +8,10 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/derailed/k9s/internal/model"
-	"github.com/derailed/k9s/internal/view/cmd"
 	"github.com/derailed/tcell/v2"
-	"github.com/derailed/tview"
+	"github.com/globlit/k9s/internal/model"
+	"github.com/globlit/k9s/internal/view/cmd"
+	"github.com/globlit/tview"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/labels"
 )

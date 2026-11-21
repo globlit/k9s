@@ -7,8 +7,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/derailed/k9s/internal"
-	"github.com/derailed/k9s/internal/client"
+	"github.com/globlit/k9s/internal"
+	"github.com/globlit/k9s/internal/client"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"

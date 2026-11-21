@@ -10,9 +10,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/dao"
 	"github.com/fvbommel/sortorder"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/dao"
 )
 
 const (

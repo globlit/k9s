@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/derailed/k9s/internal/slogs"
-	"github.com/derailed/k9s/internal/ui"
+	"github.com/globlit/k9s/internal/slogs"
+	"github.com/globlit/k9s/internal/ui"
 )
 
 const (

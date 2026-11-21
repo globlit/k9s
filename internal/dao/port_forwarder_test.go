@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/port"
-	"github.com/derailed/k9s/internal/watch"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/port"
+	"github.com/globlit/k9s/internal/watch"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"

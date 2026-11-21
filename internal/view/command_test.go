@@ -4,10 +4,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/config"
-	"github.com/derailed/k9s/internal/dao"
-	"github.com/derailed/k9s/internal/view/cmd"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/config"
+	"github.com/globlit/k9s/internal/dao"
+	"github.com/globlit/k9s/internal/view/cmd"
 	"github.com/stretchr/testify/assert"
 )
 

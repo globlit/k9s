@@ -7,14 +7,14 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/config"
-	"github.com/derailed/k9s/internal/model"
-	"github.com/derailed/k9s/internal/render"
-	"github.com/derailed/k9s/internal/slogs"
-	"github.com/derailed/k9s/internal/ui"
 	"github.com/derailed/tcell/v2"
-	"github.com/derailed/tview"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/config"
+	"github.com/globlit/k9s/internal/model"
+	"github.com/globlit/k9s/internal/render"
+	"github.com/globlit/k9s/internal/slogs"
+	"github.com/globlit/k9s/internal/ui"
+	"github.com/globlit/tview"
 )
 
 var _ model.ClusterInfoListener = (*ClusterInfo)(nil)

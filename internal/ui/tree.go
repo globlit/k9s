@@ -6,9 +6,9 @@ package ui
 import (
 	"context"
 
-	"github.com/derailed/k9s/internal/model"
 	"github.com/derailed/tcell/v2"
-	"github.com/derailed/tview"
+	"github.com/globlit/k9s/internal/model"
+	"github.com/globlit/tview"
 )
 
 // KeyListenerFunc listens to key presses.

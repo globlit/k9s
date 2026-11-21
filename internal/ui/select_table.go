@@ -5,7 +5,7 @@ package ui
 
 import (
 	"github.com/derailed/tcell/v2"
-	"github.com/derailed/tview"
+	"github.com/globlit/tview"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 

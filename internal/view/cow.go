@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/derailed/k9s/internal/config"
-	"github.com/derailed/k9s/internal/model"
-	"github.com/derailed/k9s/internal/ui"
 	"github.com/derailed/tcell/v2"
-	"github.com/derailed/tview"
+	"github.com/globlit/k9s/internal/config"
+	"github.com/globlit/k9s/internal/model"
+	"github.com/globlit/k9s/internal/ui"
+	"github.com/globlit/tview"
 )
 
 // Cow represents a bomb viewer.

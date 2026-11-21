@@ -150,7 +150,7 @@ Binaries for Linux, Windows and Mac are available as tarballs in the [release pa
 
   ```shell
   # NOTE: The dev version will be in effect!
-  go install github.com/derailed/k9s@latest
+  go install github.com/globlit/k9s@latest
   ```
 
 * Via [Webi](https://webinstall.dev) for Linux and macOS

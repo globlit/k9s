@@ -6,7 +6,7 @@ package ui
 import (
 	"sync"
 
-	"github.com/derailed/tview"
+	"github.com/globlit/tview"
 )
 
 // uiUpdate holds a queued UI mutation.

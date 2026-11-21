@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/derailed/k9s/internal/model"
-	"github.com/derailed/k9s/internal/slogs"
-	"github.com/derailed/tview"
+	"github.com/globlit/k9s/internal/model"
+	"github.com/globlit/k9s/internal/slogs"
+	"github.com/globlit/tview"
 )
 
 // Pages represents a stack of view pages.

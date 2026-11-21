@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/derailed/k9s/internal/port"
-	"github.com/derailed/k9s/internal/slogs"
-	"github.com/derailed/k9s/internal/ui"
-	"github.com/derailed/tview"
+	"github.com/globlit/k9s/internal/port"
+	"github.com/globlit/k9s/internal/slogs"
+	"github.com/globlit/k9s/internal/ui"
+	"github.com/globlit/tview"
 )
 
 const portForwardKey = "portforward"

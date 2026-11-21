@@ -7,7 +7,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/derailed/k9s/internal/config/data"
+	"github.com/globlit/k9s/internal/config/data"
 )
 
 // maxLogSize caps k9s.log. Rotation keeps one backup, k9s.log.1.

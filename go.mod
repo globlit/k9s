@@ -1,4 +1,4 @@
-module github.com/derailed/k9s
+module github.com/globlit/k9s
 
 go 1.26.8
 
@@ -10,10 +10,10 @@ require (
 	github.com/atotto/clipboard v0.1.4
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/derailed/tcell/v2 v2.3.1-rc.4
-	github.com/derailed/tview v0.8.5
 	github.com/fatih/color v1.19.0
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/fvbommel/sortorder v1.2.1
+	github.com/globlit/tview v0.0.0-20261121101100-1cffd0d1473a
 	github.com/go-errors/errors v1.5.1
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/itchyny/gojq v0.12.20
@@ -425,5 +425,3 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.2 // indirect
 )
-
-replace github.com/derailed/tview => github.com/globlit/tview v0.0.0-20261121100149-06a2679c7e18

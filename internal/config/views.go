@@ -15,10 +15,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/config/data"
-	"github.com/derailed/k9s/internal/config/json"
-	"github.com/derailed/k9s/internal/slogs"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/config/data"
+	"github.com/globlit/k9s/internal/config/json"
+	"github.com/globlit/k9s/internal/slogs"
 	"gopkg.in/yaml.v3"
 )
 

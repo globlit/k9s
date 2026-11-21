@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/derailed/k9s/internal/config"
-	"github.com/derailed/tview"
+	"github.com/globlit/k9s/internal/config"
+	"github.com/globlit/tview"
 )
 
 // LogoSmall K9s small log.

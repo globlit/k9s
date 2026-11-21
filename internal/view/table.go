@@ -10,14 +10,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/derailed/k9s/internal"
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/model"
-	"github.com/derailed/k9s/internal/render"
-	"github.com/derailed/k9s/internal/slogs"
-	"github.com/derailed/k9s/internal/ui"
-	"github.com/derailed/k9s/internal/view/cmd"
 	"github.com/derailed/tcell/v2"
+	"github.com/globlit/k9s/internal"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/model"
+	"github.com/globlit/k9s/internal/render"
+	"github.com/globlit/k9s/internal/slogs"
+	"github.com/globlit/k9s/internal/ui"
+	"github.com/globlit/k9s/internal/view/cmd"
 )
 
 // Table represents a table viewer.

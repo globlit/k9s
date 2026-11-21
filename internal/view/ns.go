@@ -6,10 +6,10 @@ package view
 import (
 	"time"
 
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/model1"
-	"github.com/derailed/k9s/internal/ui"
 	"github.com/derailed/tcell/v2"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/model1"
+	"github.com/globlit/k9s/internal/ui"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/derailed/k9s/internal/config"
 	"github.com/derailed/tcell/v2"
-	"github.com/derailed/tview"
+	"github.com/globlit/k9s/internal/config"
+	"github.com/globlit/tview"
 )
 
 const (

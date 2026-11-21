@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/model1"
-	"github.com/derailed/k9s/internal/render"
-	"github.com/derailed/k9s/internal/ui"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/model1"
+	"github.com/globlit/k9s/internal/render"
+	"github.com/globlit/k9s/internal/ui"
 )
 
 func makePodLikeData(n int) *model1.TableData {

@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/config"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/config"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/util/sets"
 )

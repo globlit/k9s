@@ -6,11 +6,11 @@ package view
 import (
 	"fmt"
 
-	"github.com/derailed/k9s/internal/client"
-	"github.com/derailed/k9s/internal/dao"
-	"github.com/derailed/k9s/internal/ui"
-	"github.com/derailed/k9s/internal/ui/dialog"
 	"github.com/derailed/tcell/v2"
+	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/dao"
+	"github.com/globlit/k9s/internal/ui"
+	"github.com/globlit/k9s/internal/ui/dialog"
 )
 
 // ReplicaSet presents a replicaset viewer.
