@@ -16,7 +16,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
-func useHelmFake(t *testing.T, h *helmfake.Helm) {
+func useHelmCfg(t *testing.T, h *helmfake.Helm) {
 	t.Helper()
 	old := helmConfigFor
 	helmConfigFor = func(*genericclioptions.ConfigFlags, string) (*action.Configuration, error) {
@@ -43,7 +43,7 @@ func TestHelmHistoryDeleteKeepsRelease(t *testing.T) {
 		t.Run(k, func(t *testing.T) {
 			h := helmfake.New(t, "ns1")
 			h.Seed(t, "r1", "ns1", 3)
-			useHelmFake(t, h)
+			useHelmCfg(t, h)
 			var hh HelmHistory
 			hh.Init(newFakeFactory(t, fakecluster.New(t)), client.HmhGVR)
 
