@@ -15,22 +15,20 @@ import (
 	"github.com/globlit/k9s/internal/dao"
 	"github.com/globlit/k9s/internal/model1"
 	"github.com/globlit/k9s/internal/render"
+	"github.com/globlit/k9s/internal/testutil/fakecluster"
 	"github.com/globlit/k9s/internal/watch"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/informers"
 )
 
 func TestTableReconcile(t *testing.T) {
 	ta := NewTable(client.PodGVR)
 	ta.SetNamespace(client.NamespaceAll)
 
-	f := makeFactory()
-	f.rows = []runtime.Object{load(t, "p1")}
-	ctx := context.WithValue(context.Background(), internal.KeyFactory, f)
+	ctx := fixtureCtx(t, client.NamespaceAll, load(t, "p1"))
 	ctx = context.WithValue(ctx, internal.KeyFields, "")
 	ctx = context.WithValue(ctx, internal.KeyWithMetrics, false)
 	err := ta.reconcile(ctx)
@@ -46,7 +44,7 @@ func TestTableList(t *testing.T) {
 	ta.SetNamespace("blee")
 
 	acc := accessor{}
-	ctx := context.WithValue(context.Background(), internal.KeyFactory, makeFactory())
+	ctx := fixtureCtx(t, "blee")
 	rows, err := ta.list(ctx, &acc)
 	require.NoError(t, err)
 	assert.Len(t, rows, 1)
@@ -56,11 +54,9 @@ func TestTableGet(t *testing.T) {
 	ta := NewTable(client.PodGVR)
 	ta.SetNamespace("blee")
 
-	f := makeFactory()
-	f.rows = []runtime.Object{load(t, "p1")}
-	ctx := context.WithValue(context.Background(), internal.KeyFactory, f)
+	ctx := fixtureCtx(t, "default", load(t, "p1"))
 	ctx = context.WithValue(ctx, internal.KeyWithMetrics, false)
-	row, err := ta.Get(ctx, "fred")
+	row, err := ta.Get(ctx, "default/nginx-7fb78fb6d8-2w75j")
 	require.NoError(t, err)
 	assert.NotNil(t, row)
 	assert.Len(t, row.(*render.PodWithMetrics).Raw.Object, 5)
@@ -120,46 +116,25 @@ func load(t *testing.T, n string) *unstructured.Unstructured {
 
 // ----------------------------------------------------------------------------
 
-func makeFactory() testFactory {
-	return testFactory{}
+func fakeFactory(tb testing.TB, ns string, oo ...runtime.Object) *watch.Factory {
+	tb.Helper()
+	fc := fakecluster.New(tb, fakecluster.WithObjects(oo...))
+	f := watch.NewFactory(fc.Conn())
+	f.Start(ns)
+	tb.Cleanup(f.Terminate)
+
+	return f
 }
 
-type testFactory struct {
-	rows []runtime.Object
-}
+// fixtureCtx returns a context with a synced fake cluster factory.
+func fixtureCtx(t *testing.T, ns string, oo ...runtime.Object) context.Context {
+	t.Helper()
+	f := fakeFactory(t, ns, oo...)
+	_, err := f.List(client.PodGVR, ns, true, labels.Everything())
+	require.NoError(t, err)
 
-var _ dao.Factory = testFactory{}
-
-func (testFactory) Client() client.Connection {
-	return client.NewTestAPIClient()
+	return context.WithValue(context.Background(), internal.KeyFactory, f)
 }
-
-func (f testFactory) Get(*client.GVR, string, bool, labels.Selector) (runtime.Object, error) {
-	if len(f.rows) > 0 {
-		return f.rows[0], nil
-	}
-	return nil, nil
-}
-
-func (f testFactory) List(*client.GVR, string, bool, labels.Selector) ([]runtime.Object, error) {
-	if len(f.rows) > 0 {
-		return f.rows, nil
-	}
-	return nil, nil
-}
-
-func (testFactory) ForResource(string, *client.GVR) (informers.GenericInformer, error) {
-	return nil, nil
-}
-
-func (testFactory) CanForResource(string, *client.GVR, []string) (informers.GenericInformer, error) {
-	return nil, nil
-}
-func (testFactory) WaitForCacheSync() {}
-func (testFactory) Forwarders() watch.Forwarders {
-	return nil
-}
-func (testFactory) DeleteForwarder(string) {}
 
 // ----------------------------------------------------------------------------
 

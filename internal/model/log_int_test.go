@@ -19,7 +19,7 @@ import (
 func TestUpdateLogs(t *testing.T) {
 	size := 100
 	m := NewLog(client.NewGVR("fred"), makeLogOpts(size), 10*time.Millisecond)
-	m.Init(makeFactory())
+	m.Init(fakeFactory(t, client.DefaultNamespace))
 
 	v := newMockLogView()
 	m.AddListener(v)
@@ -42,7 +42,7 @@ func TestUpdateLogs(t *testing.T) {
 func BenchmarkUpdateLogs(b *testing.B) {
 	size := 100
 	m := NewLog(client.NewGVR("fred"), makeLogOpts(size), 10*time.Millisecond)
-	m.Init(makeFactory())
+	m.Init(fakeFactory(b, client.DefaultNamespace))
 
 	v := newMockLogView()
 	m.AddListener(v)
@@ -112,7 +112,7 @@ func (*mockLogView) LogFailed(error) {}
 // Flush streams with no lulls while they flow.
 func TestUpdateLogsSteadyStreamFlushes(t *testing.T) {
 	m := NewLog(client.NewGVR("fred"), makeLogOpts(1000), 50*time.Millisecond)
-	m.Init(makeFactory())
+	m.Init(fakeFactory(t, client.DefaultNamespace))
 	v := newMockLogView()
 	m.AddListener(v)
 
