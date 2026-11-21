@@ -297,6 +297,13 @@ func Test_linesWithRegions(t *testing.T) {
 			},
 			e: []string{"foo", "b" + matchTag(0, "a") + "r", "baz"},
 		},
+		"multibyte-rune": {
+			lines: []string{"blee é ü"},
+			matches: fuzzy.Matches{
+				{Index: 0, MatchedIndexes: []int{5, 8}},
+			},
+			e: []string{"blee " + matchTag(0, "é") + " " + matchTag(0, "ü")},
+		},
 		"multiple-matches": {
 			lines: []string{"foo", "bar", "baz"},
 			matches: fuzzy.Matches{
