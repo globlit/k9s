@@ -28,6 +28,8 @@ type App struct {
 	cmdBuff *model.FishBuff
 	running bool
 	mx      sync.RWMutex
+
+	dispatch *dispatcher
 }
 
 // NewApp returns a new app.
@@ -39,6 +41,7 @@ func NewApp(cfg *config.Config, _ string) *App {
 		Main:         NewPages(),
 		flash:        model.NewFlash(model.DefaultFlashDelay),
 		cmdBuff:      model.NewFishBuff(':', model.CommandBuffer),
+		dispatch:     newDispatcher(),
 	}
 
 	a.views = map[string]tview.Primitive{
@@ -61,24 +64,22 @@ func (a *App) Init() {
 	a.SetRoot(a.Main, true).EnableMouse(a.Config.K9s.UI.EnableMouse)
 }
 
-// QueueUpdate queues up a ui action.
+// QueueUpdate queues up a ui action. Updates run in order on the UI
+// goroutine; the call never blocks.
 func (a *App) QueueUpdate(f func()) {
 	if a.Application == nil {
 		return
 	}
-	go func() {
-		a.Application.QueueUpdate(f)
-	}()
+	a.dispatch.enqueue(a.Application, uiUpdate{f: f})
 }
 
-// QueueUpdateDraw queues up a ui action and redraw the ui.
+// QueueUpdateDraw queues up a ui action and redraw the ui. Bursts of
+// updates are applied together and drawn once.
 func (a *App) QueueUpdateDraw(f func()) {
 	if a.Application == nil {
 		return
 	}
-	go func() {
-		a.Application.QueueUpdateDraw(f)
-	}()
+	a.dispatch.enqueue(a.Application, uiUpdate{f: f, draw: true})
 }
 
 // IsRunning checks if app is actually running.
@@ -158,6 +159,7 @@ func (a *App) BailOut(exitCode int) {
 	}
 
 	a.Stop()
+	RunExitHooks()
 	os.Exit(exitCode)
 }
 
