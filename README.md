@@ -376,6 +376,30 @@ K9S_LOGS_DIR=/var/log k9s
 less /var/log/k9s.log
 ```
 
+The log file is rotated at 50MB; the previous one is kept as `k9s.log.1`.
+
+### Profiling and memory
+
+K9s sets a 2GiB soft memory limit by default. Set `GOMEMLIMIT` (e.g. `GOMEMLIMIT=4GiB`, or `off`) to change it.
+
+To investigate performance issues:
+
+```shell
+# Write a CPU profile of the whole session (flushed when k9s exits)
+K9S_CPUPROFILE=/tmp/k9s.pprof k9s
+go tool pprof -top /tmp/k9s.pprof
+
+# Or serve live pprof endpoints (loopback addresses only)
+K9S_PPROF_ADDR=127.0.0.1:6060 k9s
+go tool pprof http://127.0.0.1:6060/debug/pprof/heap
+```
+
+Builds use profile-guided optimization from `default.pgo` at the repository root. To refresh it from real usage, merge profiles from representative sessions:
+
+```shell
+go tool pprof -proto session1.pprof session2.pprof > default.pgo
+```
+
 ## Key Bindings
 
 K9s uses aliases to navigate most K8s resources.
@@ -939,6 +963,20 @@ jumps:
 
 ---
 
+## FluxCD
+
+K9s has built-in actions for [Flux](https://fluxcd.io) resources. They talk to the API server directly, so the `flux` CLI is not needed. They work for any API version of the toolkit kinds (Kustomizations, HelmReleases, sources, image automation, notifications) and for Flux Operator resources (FluxInstance, ResourceSet, ResourceSetInputProvider).
+
+| Key       | Action              | Applies to                                                                                                         |
+|-----------|---------------------|--------------------------------------------------------------------------------------------------------------------|
+| `Shift-R` | Reconcile           | All reconcilable Flux kinds                                                                                        |
+| `Shift-W` | Reconcile w/ Source | Kustomizations and HelmReleases: reconciles their source (and a HelmChart's own source) first, like `--with-source` |
+| `Shift-T` | Suspend/Resume      | All suspendable Flux kinds. Resumes when all selected are suspended, otherwise suspends                             |
+| `Shift-F` | Force/Reset         | HelmReleases: force an upgrade and/or reset retry failures (Flux >= 2.3)                                           |
+| `Shift-Z` | Jump Source         | Kustomizations and HelmReleases: open the source (or generated HelmChart)                                          |
+
+Actions apply to all marked resources. Reconciling a suspended resource is refused, as with the flux CLI. In read-only mode, only Jump Source is available.
+
 ## Plugins
 
 K9s allows you to extend your command line and tooling by defining your very own cluster commands via plugins.
@@ -1383,6 +1421,10 @@ k9s:
     limits:
       cpu: 100m
       memory: 100Mi
+  # Vulnerability scans are cached across sessions in $XDG_CACHE_HOME/k9s/vul-scans
+  # ($K9S_CONFIG_DIR/vul-scans when set): image SBOMs (digest refs: kept, tag refs: 24h)
+  # and results (until the vulnerability DB updates). Unused entries go after 30 days,
+  # the cache is capped at 1GiB. Delete the directory to force fresh scans.
   imageScans:
     enable: false
     exclusions:
