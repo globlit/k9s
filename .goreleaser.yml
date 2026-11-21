@@ -88,6 +88,19 @@ archives:
 checksum:
   name_template: "checksums.sha256"
 
+# Per-file <artifact>.sha256 next to the combined checksums.sha256.
+signs:
+  - id: archive-sha256
+    artifacts: archive
+    signature: "${artifact}.sha256"
+    cmd: sh
+    args: ["-c", "cd dist && sha256sum ${artifactName} > ${artifactName}.sha256"]
+  - id: package-sha256
+    artifacts: package
+    signature: "${artifact}.sha256"
+    cmd: sh
+    args: ["-c", "cd dist && sha256sum ${artifactName} > ${artifactName}.sha256"]
+
 snapshot:
   version_template: "{{ .Tag }}-next"
 
@@ -97,20 +110,6 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
-
-brews:
-  - name: k9s
-    repository:
-      owner: derailed
-      name: homebrew-k9s
-    commit_author:
-      name: derailed
-      email: fernand@imhotep.io
-    directory: Formula
-    homepage: https://k9scli.io/
-    description: Kubernetes CLI To Manage Your Clusters In Style!
-    test: |
-      system "k9s version"
 
 nfpms:
   - file_name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}'
