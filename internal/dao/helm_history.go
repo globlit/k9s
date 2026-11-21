@@ -38,7 +38,7 @@ func (h *HelmHistory) List(ctx context.Context, _ string) ([]runtime.Object, err
 	}
 	ns, n := client.Namespaced(path)
 
-	cfg, err := ensureHelmConfig(h.Client().Config().Flags(), ns)
+	cfg, err := helmConfigFor(h.Client().Config().Flags(), ns)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func (h *HelmHistory) Get(_ context.Context, path string) (runtime.Object, error
 	}
 
 	ns, n := client.Namespaced(fqn)
-	cfg, err := ensureHelmConfig(h.Client().Config().Flags(), ns)
+	cfg, err := helmConfigFor(h.Client().Config().Flags(), ns)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +137,7 @@ func (h *HelmHistory) GetValues(path string, allValues bool) ([]byte, error) {
 
 func (h *HelmHistory) Rollback(_ context.Context, path, rev string) error {
 	ns, n := client.Namespaced(path)
-	cfg, err := ensureHelmConfig(h.Client().Config().Flags(), ns)
+	cfg, err := helmConfigFor(h.Client().Config().Flags(), ns)
 	if err != nil {
 		return err
 	}
@@ -155,7 +155,7 @@ func (h *HelmHistory) Rollback(_ context.Context, path, rev string) error {
 // Delete uninstall a Helm.
 func (h *HelmHistory) Delete(_ context.Context, path string, _ *metav1.DeletionPropagation, _ Grace) error {
 	ns, n := client.Namespaced(path)
-	cfg, err := ensureHelmConfig(h.Client().Config().Flags(), ns)
+	cfg, err := helmConfigFor(h.Client().Config().Flags(), ns)
 	if err != nil {
 		return err
 	}

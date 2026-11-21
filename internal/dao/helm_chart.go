@@ -35,7 +35,7 @@ type HelmChart struct {
 
 // List returns a collection of resources.
 func (h *HelmChart) List(_ context.Context, ns string) ([]runtime.Object, error) {
-	cfg, err := ensureHelmConfig(h.Client().Config().Flags(), ns)
+	cfg, err := helmConfigFor(h.Client().Config().Flags(), ns)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (h *HelmChart) List(_ context.Context, ns string) ([]runtime.Object, error)
 // Get returns a resource.
 func (h *HelmChart) Get(_ context.Context, path string) (runtime.Object, error) {
 	ns, n := client.Namespaced(path)
-	cfg, err := ensureHelmConfig(h.Client().Config().Flags(), ns)
+	cfg, err := helmConfigFor(h.Client().Config().Flags(), ns)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func (h *HelmChart) Get(_ context.Context, path string) (runtime.Object, error) 
 // GetValues returns values for a release
 func (h *HelmChart) GetValues(path string, allValues bool) ([]byte, error) {
 	ns, n := client.Namespaced(path)
-	cfg, err := ensureHelmConfig(h.Client().Config().Flags(), ns)
+	cfg, err := helmConfigFor(h.Client().Config().Flags(), ns)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func (h *HelmChart) GetValues(path string, allValues bool) ([]byte, error) {
 // Describe returns the chart notes.
 func (h *HelmChart) Describe(path string) (string, error) {
 	ns, n := client.Namespaced(path)
-	cfg, err := ensureHelmConfig(h.Client().Config().Flags(), ns)
+	cfg, err := helmConfigFor(h.Client().Config().Flags(), ns)
 	if err != nil {
 		return "", err
 	}
@@ -106,7 +106,7 @@ func (h *HelmChart) Describe(path string) (string, error) {
 // ToYAML returns the chart manifest.
 func (h *HelmChart) ToYAML(path string, _ bool) (string, error) {
 	ns, n := client.Namespaced(path)
-	cfg, err := ensureHelmConfig(h.Client().Config().Flags(), ns)
+	cfg, err := helmConfigFor(h.Client().Config().Flags(), ns)
 	if err != nil {
 		return "", err
 	}
@@ -127,7 +127,7 @@ func (h *HelmChart) Delete(_ context.Context, path string, _ *metav1.DeletionPro
 func (h *HelmChart) Uninstall(path string, keepHist bool) error {
 	ns, n := client.Namespaced(path)
 	flags := h.Client().Config().Flags()
-	cfg, err := ensureHelmConfig(flags, ns)
+	cfg, err := helmConfigFor(flags, ns)
 	if err != nil {
 		return err
 	}
@@ -151,6 +151,9 @@ var (
 )
 
 const maxHelmCfgCache = 32
+
+// helmConfigFor returns the helm config to use. Tests replace it.
+var helmConfigFor = ensureHelmConfig
 
 // ensureHelmConfig returns a cached helm config per flags and namespace.
 // Building one parses the kubeconfig and opens new connections.
