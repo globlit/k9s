@@ -60,6 +60,9 @@ var (
 	// AppDumpsDir tracks screen dumps data directory.
 	AppDumpsDir string
 
+	// AppVulCacheDir tracks the image vulnerability scans cache directory.
+	AppVulCacheDir string
+
 	// AppContextsDir tracks contexts data directory.
 	AppContextsDir string
 
@@ -131,6 +134,8 @@ func initK9sEnvLocs() error {
 	if err := data.EnsureFullPath(AppDumpsDir, data.DefaultDirMod); err != nil {
 		slog.Warn("Unable to create screen-dumps dir", slogs.Dir, AppDumpsDir, slogs.Error, err)
 	}
+	// Created lazily, with private perms, by the scanner.
+	AppVulCacheDir = filepath.Join(AppConfigDir, "vul-scans")
 	AppBenchmarksDir = filepath.Join(AppConfigDir, "benchmarks")
 	if err := data.EnsureFullPath(AppBenchmarksDir, data.DefaultDirMod); err != nil {
 		slog.Warn("Unable to create benchmarks dir",
@@ -190,6 +195,10 @@ func initXDGLocs() error {
 	AppDumpsDir, err = xdg.StateFile(filepath.Join(AppName, "screen-dumps"))
 	if err != nil {
 		return err
+	}
+
+	if AppVulCacheDir, err = xdg.CacheFile(filepath.Join(AppName, "vul-scans")); err != nil {
+		slog.Warn("No vulnerability scans cache dir detected", slogs.Error, err)
 	}
 
 	AppBenchmarksDir, err = xdg.StateFile(filepath.Join(AppName, "benchmarks"))
