@@ -328,6 +328,10 @@ func (c *Command) viewMetaFor(p *cmd.Interpreter) (*client.GVR, *MetaViewer, *cm
 	}
 	if mv, ok := customViewers[gvr]; ok {
 		v = mv
+	} else if dao.IsFluxGVR(gvr) {
+		v.viewerFn = func(gvr *client.GVR) ResourceViewer {
+			return NewFluxExtender(NewScaleExtender(NewOwnerExtender(NewBrowser(gvr))))
+		}
 	}
 
 	return gvr, &v, p, nil
