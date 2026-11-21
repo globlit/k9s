@@ -49,9 +49,6 @@ func (n *NonResource) getFactory() Factory {
 
 // GVR returns a gvr.
 func (n *NonResource) GVR() string {
-	n.mx.RLock()
-	defer n.mx.RUnlock()
-
 	return n.gvrStr()
 }
 
