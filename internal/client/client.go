@@ -31,10 +31,8 @@ import (
 const (
 	cacheSize   = 100
 	cacheExpiry = 5 * time.Minute
-	// discoveryCacheExpiry is the on-disk discovery cache TTL (same as
-	// kubectl). With 5m nearly every launch re-fetched discovery, which is
-	// slow on constrained networks. New CRDs are still picked up live
-	// through the CRD informer, and the cache is invalidated on reconnect.
+	// discoveryCacheExpiry sets the disk discovery cache TTL, as kubectl does.
+	// The CRD informer picks up new CRDs; reconnects invalidate the cache.
 	discoveryCacheExpiry = 6 * time.Hour
 	cacheMXAPIKey        = "metricsAPI"
 	serverVersion        = "serverVersion"
@@ -309,8 +307,7 @@ func (a *APIClient) ValidNamespaceNames() (NamespaceNames, error) {
 	return nns, nil
 }
 
-// pingTimeout bounds health checks so a dead link is detected quickly instead
-// of waiting for the (default 2m) api call timeout.
+// pingTimeout bounds health checks to detect dead links fast.
 func (a *APIClient) pingTimeout() time.Duration {
 	const maxPing = 10 * time.Second
 	if t := a.config.CallTimeout(); t > 0 && t < maxPing {
@@ -331,10 +328,8 @@ func (a *APIClient) CheckConnectivity() bool {
 		}
 	}()
 
-	// Fast path: while healthy, ping through the existing client. Building
-	// a new clientset every check opens a fresh TCP/TLS connection (and a
-	// proxy CONNECT when a proxy is configured, as transports with a proxy
-	// func are never cached by client-go).
+	// Fast path: ping through the existing client while healthy. A new
+	// clientset opens a new TCP/TLS connection, plus a proxy CONNECT.
 	if a.getConnOK() {
 		if c := a.getClient(); c != nil && c.Discovery() != nil {
 			if rc := c.Discovery().RESTClient(); rc != nil && !reflect.ValueOf(rc).IsNil() {
@@ -653,7 +648,7 @@ func (a *APIClient) supportsMetricsResources() error {
 
 	apiGroups, err := a.serverGroups()
 	if err != nil {
-		// Don't cache transient failures as "no metrics server".
+		// Don't cache transient failures.
 		return err
 	}
 	defer func() {
@@ -672,10 +667,9 @@ func (a *APIClient) supportsMetricsResources() error {
 	return metricsUnsupportedErr
 }
 
-// serverGroups returns the api groups, preferring the on-disk discovery cache
-// to avoid a full discovery round trip at startup.
+// serverGroups returns API groups, from the disk discovery cache if possible.
 func (a *APIClient) serverGroups() (*metav1.APIGroupList, error) {
-	// Dial first: it builds and stores the shared client (no network call).
+	// Dial builds the shared client, no network call.
 	dial, err := a.Dial()
 	if err != nil {
 		if a.HasActiveContext() {

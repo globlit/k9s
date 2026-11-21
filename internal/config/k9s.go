@@ -24,8 +24,7 @@ import (
 
 type gpuVendors map[string]string
 
-// knownGPUVendors tracks a set of known GPU vendors. The map is treated as
-// immutable: updates swap in a new map so readers never race with writers.
+// knownGPUVendors tracks known GPU vendors. Copy on write: never mutate.
 var knownGPUVendors atomic.Pointer[gpuVendors]
 
 func init() {
@@ -37,7 +36,6 @@ func init() {
 }
 
 // KnownGPUVendors returns a read-only snapshot of known GPU vendors.
-// Callers must not mutate the returned map.
 func KnownGPUVendors() map[string]string {
 	return *knownGPUVendors.Load()
 }
@@ -318,7 +316,7 @@ func (k *K9s) ActivateContext(contextName string) (*data.Context, error) {
 			}
 		}
 	} else {
-		// Don't carry the previous context's proxy over to this one.
+		// Drop the previous context proxy.
 		k.ks.SetProxy(nil)
 		if k.conn != nil && k.conn.Config() != nil {
 			k.conn.Config().SetProxy(nil)
@@ -508,9 +506,7 @@ func (k *K9s) Validate(c client.Connection, contextName, clusterName string) {
 	if k.ShellPod != nil {
 		k.ShellPod.Validate()
 	}
-	// Validate runs on every config save while views read these settings
-	// from refresh goroutines: only write them when something actually
-	// needs fixing.
+	// Write only on change: views read these settings concurrently.
 	if l := k.Logger.Validate(); l != k.Logger {
 		k.Logger = l
 	}

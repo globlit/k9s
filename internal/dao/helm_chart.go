@@ -152,10 +152,8 @@ var (
 
 const maxHelmCfgCache = 32
 
-// ensureHelmConfig returns a helm configuration for the given flags and
-// namespace. Building one parses the kubeconfig and creates new API clients
-// (new TCP/TLS connections), so they are cached instead of being rebuilt on
-// every refresh.
+// ensureHelmConfig returns a cached helm config per flags and namespace.
+// Building one parses the kubeconfig and opens new connections.
 func ensureHelmConfig(flags *genericclioptions.ConfigFlags, ns string) (*action.Configuration, error) {
 	key := strings.Join([]string{
 		deref(flags.Context), deref(flags.KubeConfig), deref(flags.APIServer),

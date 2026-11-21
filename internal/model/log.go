@@ -48,21 +48,18 @@ type Log struct {
 	logOptions *dao.LogOptions
 	cancelFn   context.CancelFunc
 	mx         sync.RWMutex
-	// lmx guards listeners independently of mx so listeners can be fired
-	// while mx is held.
+	// lmx guards listeners, separate from mx to fire under mx.
 	lmx          sync.RWMutex
 	filter       string
 	flushTimeout time.Duration
-	// maxLines caps the in-memory buffer (logger.buffer). Zero falls back to
-	// the tail count.
+	// maxLines caps the buffer (logger.buffer). Zero uses the tail count.
 	maxLines int
-	// total counts lines ever appended; sent is the value of total at the
-	// last flush. Unlike a buffer index, these never move when the buffer
-	// rotates, so lines are never silently dropped between flushes.
+	// total counts appended lines; sent holds total at last flush. Both
+	// survive buffer rotation, so flushes never skip lines.
 	total, sent uint64
-	// flushCtx identifies the running flusher, if any.
+	// flushCtx identifies the running flusher.
 	flushCtx context.Context
-	// notifyMx serializes flushes so listeners always receive lines in order.
+	// notifyMx serializes flushes to keep lines in order.
 	notifyMx sync.Mutex
 }
 
@@ -132,7 +129,7 @@ func (l *Log) Configure(opts config.Logger) {
 	l.maxLines = opts.BufferSize
 }
 
-// capacity returns the max number of lines kept in memory. Caller holds mx.
+// capacity returns the max buffered lines. Caller holds mx.
 func (l *Log) capacity() int {
 	c := l.maxLines
 	if tail := int(l.logOptions.Lines); tail > c {
@@ -285,7 +282,7 @@ func (l *Log) Append(line *dao.LogItem) {
 	l.lines.Shift(line)
 }
 
-// Notify sends lines appended since the last flush to the listeners.
+// Notify sends lines appended since the last flush.
 func (l *Log) Notify() {
 	l.notifyMx.Lock()
 	defer l.notifyMx.Unlock()
@@ -305,8 +302,7 @@ func (l *Log) Notify() {
 		slog.Debug("Log lines rotated out before display", slogs.Count, pending-uint64(n))
 	}
 	l.sent = l.total
-	// Snapshot the new items so rendering and filtering happen outside the
-	// lock and never stall the stream readers.
+	// Snapshot new items: render and filter off-lock.
 	batch := l.lines.Subset(index)
 	q, showTime := l.filter, l.logOptions.ShowTimestamp
 	l.mx.Unlock()
@@ -320,8 +316,7 @@ func (l *Log) ToggleAllContainers(ctx context.Context) {
 	l.Restart(ctx)
 }
 
-// updateLogs reads a single log stream into the buffer. Flushing to the
-// view is done by a single flusher shared by all streams.
+// updateLogs reads one stream into the buffer. One flusher serves all streams.
 func (l *Log) updateLogs(ctx context.Context, c dao.LogChan) {
 	defer internal.LogPanic("log updater")
 	l.ensureFlusher(ctx)
@@ -345,7 +340,7 @@ func (l *Log) updateLogs(ctx context.Context, c dao.LogChan) {
 	}
 }
 
-// ensureFlusher starts the flusher for ctx unless one is already running.
+// ensureFlusher starts the flusher for ctx unless already running.
 func (l *Log) ensureFlusher(ctx context.Context) {
 	l.mx.Lock()
 	if l.flushCtx == ctx {
@@ -358,9 +353,8 @@ func (l *Log) ensureFlusher(ctx context.Context) {
 	go l.flusher(ctx)
 }
 
-// flusher pushes new lines to the view at a steady rate. A single ticker
-// for all streams means busy streams flush promptly (a per-line timer only
-// fires after a lull) and the UI gets one batched update per tick.
+// flusher pushes new lines on a ticker shared by all streams: busy streams
+// flush promptly and the UI gets one batch per tick.
 func (l *Log) flusher(ctx context.Context) {
 	defer internal.LogPanic("log flusher")
 	d := l.flushTimeout
@@ -403,8 +397,7 @@ func (l *Log) RemoveListener(listener LogsListener) {
 	l.listeners = ll
 }
 
-// snapshotListeners returns the current listeners. Slices are replaced on
-// write, so the returned slice is never mutated.
+// snapshotListeners returns current listeners. Copy on write: never mutated.
 func (l *Log) snapshotListeners() []LogsListener {
 	l.lmx.RLock()
 	defer l.lmx.RUnlock()
@@ -412,7 +405,7 @@ func (l *Log) snapshotListeners() []LogsListener {
 	return l.listeners
 }
 
-// fireBatch renders/filters a snapshot of log items and notifies listeners.
+// fireBatch renders and filters items, then notifies listeners.
 func (l *Log) fireBatch(items *dao.LogItems, q string, showTime bool) {
 	var ll [][]byte
 	if q == "" {
@@ -446,7 +439,7 @@ func highlight(lines [][]byte, matches []int, indices [][]int) [][]byte {
 	return filtered
 }
 
-// fireAll clears the listeners and re-sends the whole buffer.
+// fireAll clears listeners and re-sends the whole buffer.
 func (l *Log) fireAll() {
 	l.notifyMx.Lock()
 	defer l.notifyMx.Unlock()

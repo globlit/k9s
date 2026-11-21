@@ -70,8 +70,8 @@ func (n *Namespace) Validate(conn client.Connection) {
 	if conn == nil || !n.validating.CompareAndSwap(false, true) {
 		return
 	}
-	// Checking namespaces may LIST them all: never block startup or the UI
-	// on it. Invalid favorites are pruned once the answer comes back.
+	// Validate in the background: checks may LIST all namespaces.
+	// Prune invalid favorites on reply.
 	go func() {
 		defer n.validating.Store(false)
 		defer func() {
@@ -108,8 +108,8 @@ type nsYAML struct {
 	Favorites     []string `yaml:"favorites"`
 }
 
-// MarshalYAML snapshots the namespace under its lock: favorites may be
-// pruned by a background validation while the config is being saved.
+// MarshalYAML snapshots the namespace under lock: background validation
+// may prune favorites during saves.
 func (n *Namespace) MarshalYAML() (any, error) {
 	n.mx.RLock()
 	defer n.mx.RUnlock()

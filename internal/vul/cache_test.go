@@ -213,7 +213,7 @@ func testOpts() *options.Grype {
 	return options.DefaultGrype(clio.Identification{Name: "k9s", Version: "test"})
 }
 
-// fakeScanner wires a scanner to a cache with stubbed providers and matcher.
+// fakeScanner stubs providers and matcher over a real cache.
 type fakeScanner struct {
 	*imageScanner
 	provided, fromSBOM, matched int
@@ -255,7 +255,7 @@ func TestScannerUsesCache(t *testing.T) {
 	require.True(t, ok)
 	want := sc.Tally
 
-	// Restart, same DB: result hit, no work at all.
+	// Restart, same DB: result hit, no work.
 	s = newFakeScanner(t, dir, db1)
 	s.scanWorker(pinnedImg)
 	assert.Equal(t, [3]int{0, 0, 0}, [3]int{s.provided, s.fromSBOM, s.matched})
@@ -268,7 +268,7 @@ func TestScannerUsesCache(t *testing.T) {
 	s.scanWorker(pinnedImg)
 	assert.Equal(t, [3]int{0, 1, 1}, [3]int{s.provided, s.fromSBOM, s.matched})
 
-	// And that new result is now cached for db2.
+	// Expect a cached db2 result.
 	s = newFakeScanner(t, dir, db2)
 	s.scanWorker(pinnedImg)
 	assert.Equal(t, [3]int{0, 0, 0}, [3]int{s.provided, s.fromSBOM, s.matched})

@@ -72,8 +72,7 @@ func (a *Aliases) ShortNames() ShortNames {
 	return m
 }
 
-// Keys returns a snapshot of all alias names.
-// It is safe to call while aliases are being redefined.
+// Keys returns a snapshot of alias names. Safe during redefinition.
 func (a *Aliases) Keys() []string {
 	a.mx.RLock()
 	defer a.mx.RUnlock()

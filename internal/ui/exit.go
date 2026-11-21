@@ -10,8 +10,7 @@ var (
 	exitHooks   []func()
 )
 
-// OnExit registers a function to run before k9s exits through BailOut,
-// which calls os.Exit and so skips deferred calls (e.g. flushing a profile).
+// OnExit registers f to run on BailOut: os.Exit skips deferred calls.
 func OnExit(f func()) {
 	exitHooksMx.Lock()
 	defer exitHooksMx.Unlock()

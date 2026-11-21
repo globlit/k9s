@@ -9,8 +9,8 @@ import (
 	"github.com/derailed/tview"
 )
 
-// ShowHelmUpgrade pops the HelmRelease force/reset reconcile dialog. ok is
-// only called when at least one option is checked.
+// ShowHelmUpgrade pops the HelmRelease force/reset dialog. Call ok only
+// with at least one option checked.
 func ShowHelmUpgrade(styles *config.Dialog, pages *ui.Pages, msg string, ok func(force, reset bool)) {
 	force, reset := false, false
 	f := tview.NewForm()

@@ -69,7 +69,7 @@ func TestStderrRouting(t *testing.T) {
 		close(done)
 	}()
 
-	// TUI active: output must never reach the terminal.
+	// TUI active: keep output off the terminal.
 	SetStderrCaptured(true)
 	_, _ = w.WriteString("Please visit https://login.example.com\n")
 	assert.Eventually(t, func() bool {
@@ -78,7 +78,7 @@ func TestStderrRouting(t *testing.T) {
 		return len(lines) == 1
 	}, time.Second, 10*time.Millisecond)
 
-	// TUI suspended: output goes straight to the terminal, unbuffered.
+	// TUI suspended: pass output through unbuffered.
 	SetStderrCaptured(false)
 	_, _ = w.WriteString("Password: ")
 	assert.Eventually(t, func() bool {

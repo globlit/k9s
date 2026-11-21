@@ -23,8 +23,8 @@ const (
 	FluxForceAtAnn     = "reconcile.fluxcd.io/forceAt"
 	FluxResetAtAnn     = "reconcile.fluxcd.io/resetAt"
 
-	// fluxOperatorReconcileAnn suspends (disabled) or resumes (enabled)
-	// Flux Operator resources, which have no spec.suspend.
+	// fluxOperatorReconcileAnn suspends (disabled) or resumes (enabled) Flux
+	// Operator resources. They have no spec.suspend.
 	fluxOperatorReconcileAnn = "fluxcd.controlplane.io/reconcile"
 
 	fluxSourceGroup   = "source.toolkit.fluxcd.io"
@@ -36,9 +36,9 @@ const (
 type FluxCaps struct {
 	// Suspend supports suspend/resume.
 	Suspend bool
-	// Reconcile has a controller honouring reconcile.fluxcd.io/requestedAt.
+	// Reconcile honours reconcile.fluxcd.io/requestedAt.
 	Reconcile bool
-	// Source references a source that can be reconciled or jumped to.
+	// Source references a reconcilable source.
 	Source bool
 	// Operator is a Flux Operator resource (annotation based suspend).
 	Operator bool
@@ -113,8 +113,8 @@ func (t FluxTarget) String() string {
 	return t.GVR.R() + " " + t.FQN()
 }
 
-// FluxIsSuspended reports whether a Flux object is suspended. A missing
-// spec.suspend means active.
+// FluxIsSuspended reports whether a Flux object is suspended.
+// Missing spec.suspend means active.
 func FluxIsSuspended(o *unstructured.Unstructured, caps FluxCaps) bool {
 	if o == nil {
 		return false
@@ -132,8 +132,8 @@ func FluxTimestamp(t time.Time) string {
 	return t.Format(time.RFC3339Nano)
 }
 
-// FluxSuspendPatch builds the merge patch that suspends or resumes an
-// object. Resume also requests a reconcile, as `flux resume` does.
+// FluxSuspendPatch builds a suspend or resume merge patch.
+// Resume also requests a reconcile, like `flux resume`.
 func FluxSuspendPatch(caps FluxCaps, suspend bool, now string) []byte {
 	anns := map[string]any{}
 	body := map[string]any{}
@@ -156,9 +156,8 @@ func FluxSuspendPatch(caps FluxCaps, suspend bool, now string) []byte {
 	return mustJSON(body)
 }
 
-// FluxReconcilePatch builds the merge patch requesting a reconcile. Extra
-// annotations (forceAt, resetAt) must carry the same value as requestedAt
-// for helm-controller to honour them.
+// FluxReconcilePatch builds a reconcile request merge patch. Extra
+// annotations (forceAt, resetAt) must match requestedAt for helm-controller.
 func FluxReconcilePatch(now string, extra ...string) []byte {
 	anns := map[string]any{FluxRequestedAtAnn: now}
 	for _, a := range extra {
@@ -177,8 +176,8 @@ func mustJSON(v any) []byte {
 	return bb
 }
 
-// FluxPatch applies a merge patch. Strict field validation turns a patch on
-// a field the CRD doesn't have into an error instead of a silent no-op.
+// FluxPatch applies a merge patch. Strict field validation rejects unknown
+// fields instead of ignoring them.
 func FluxPatch(ctx context.Context, dial dynamic.Interface, t FluxTarget, body []byte) error {
 	_, err := dial.Resource(t.GVR.GVR()).Namespace(t.Namespace).Patch(
 		ctx, t.Name, types.MergePatchType, body,
@@ -232,9 +231,8 @@ func (r fluxRef) target(defaultGroup, defaultNS string, resolve GKResolver) (Flu
 	return FluxTarget{GVR: gvr, Namespace: ns, Name: r.name}, nil
 }
 
-// FluxSource returns the object a Kustomization or HelmRelease pulls from:
-// its source for a Kustomization or a HelmRelease chartRef, or the
-// HelmChart generated for a HelmRelease chart template.
+// FluxSource returns the source of a Kustomization or HelmRelease: sourceRef,
+// chartRef, or the HelmChart generated from a chart template.
 func FluxSource(gvr *client.GVR, o *unstructured.Unstructured, resolve GKResolver) (FluxTarget, error) {
 	ns := o.GetNamespace()
 	switch gvr.R() {
@@ -256,8 +254,8 @@ func FluxSource(gvr *client.GVR, o *unstructured.Unstructured, resolve GKResolve
 		if !ok {
 			return FluxTarget{}, fmt.Errorf("unknown kind HelmChart.%s", fluxSourceGroup)
 		}
-		// helm-controller names the chart <hr-namespace>-<hr-name> and
-		// creates it next to the chart's source.
+		// helm-controller names the chart <hr-namespace>-<hr-name>, in the
+		// chart source namespace.
 		chartNS := ref.namespace
 		if chartNS == "" {
 			chartNS = ns
@@ -268,21 +266,19 @@ func FluxSource(gvr *client.GVR, o *unstructured.Unstructured, resolve GKResolve
 	}
 }
 
-// ObjectGetter fetches an object (used to follow HelmChart sources).
+// ObjectGetter fetches an object.
 type ObjectGetter func(ctx context.Context, t FluxTarget) (*unstructured.Unstructured, error)
 
-// FluxSourceChain returns the objects to reconcile, source first, to pick
-// up the latest upstream changes for a Kustomization or HelmRelease, like
-// `flux reconcile --with-source`. Unlike the CLI it doesn't wait for each
-// source to be ready: controllers react to the new artifact on their own.
+// FluxSourceChain returns objects to reconcile, source first, like
+// `flux reconcile --with-source`. Don't wait for sources: controllers react
+// to new artifacts.
 func FluxSourceChain(ctx context.Context, gvr *client.GVR, o *unstructured.Unstructured, resolve GKResolver, get ObjectGetter) ([]FluxTarget, error) {
 	src, err := FluxSource(gvr, o, resolve)
 	if err != nil {
 		return nil, err
 	}
 	chain := []FluxTarget{src}
-	// A HelmChart has a source of its own (HelmRepository, GitRepository,
-	// Bucket): reconcile it too, before the chart.
+	// Reconcile the HelmChart source before the chart.
 	if src.GVR.G() == fluxSourceGroup && src.GVR.R() == "helmcharts" {
 		var ref fluxRef
 		var ok bool
@@ -300,7 +296,7 @@ func FluxSourceChain(ctx context.Context, gvr *client.GVR, o *unstructured.Unstr
 			if err != nil {
 				return nil, err
 			}
-			// The chart's source lives in the chart's namespace.
+			// Chart sources live in the chart namespace.
 			up.Namespace = src.Namespace
 			chain = []FluxTarget{up, src}
 		}

@@ -52,20 +52,13 @@ type Log struct {
 	follow            bool
 	columnLock        bool
 	requestOneRefresh bool
-	// placeholder is true while the "waiting for logs" message is shown.
-	// Only touched on the UI goroutine. Replaces comparing the full text
-	// buffer (up to logger.buffer lines) on every flush.
+	// placeholder tracks the "waiting for logs" message. UI goroutine only.
 	placeholder bool
 	feed        logFeed
 }
 
-// logFeed coalesces log updates so at most one UI update is pending.
-//
-// Writing to a tview TextView invalidates its line index and the next draw
-// re-indexes the whole buffer (~150ms for 5k lines). Queuing one draw per
-// model flush on a chatty multi-pod stream backs up the UI goroutine until
-// the view freezes. Instead, lines accumulate here and are drained by a
-// single pending update, paced by the measured cost of the previous draw.
+// logFeed coalesces log updates: keep at most one UI update pending, paced
+// by the previous draw cost. One draw per flush freezes chatty streams.
 type logFeed struct {
 	mx        sync.Mutex
 	pending   [][]byte
@@ -81,8 +74,7 @@ const (
 	maxLogDrawGap = time.Second
 )
 
-// add queues lines, dropping the oldest beyond maxLines (the view would
-// drop them anyway).
+// add queues lines, dropping the oldest beyond maxLines.
 func (f *logFeed) add(lines [][]byte) {
 	f.mx.Lock()
 	defer f.mx.Unlock()
@@ -93,7 +85,7 @@ func (f *logFeed) add(lines [][]byte) {
 	}
 }
 
-// reset drops pending lines and requests the view be cleared first.
+// reset drops pending lines and requests a view clear.
 func (f *logFeed) reset() {
 	f.mx.Lock()
 	defer f.mx.Unlock()
@@ -101,7 +93,7 @@ func (f *logFeed) reset() {
 	f.pending, f.clear = nil, true
 }
 
-// next reports whether an update must be scheduled and after what delay.
+// next reports whether to schedule an update, and its delay.
 func (f *logFeed) next() (bool, time.Duration) {
 	f.mx.Lock()
 	defer f.mx.Unlock()
@@ -222,7 +214,7 @@ func (l *Log) LogResume() {
 	l.cancelUpdates = false
 }
 
-// clearPlaceholder removes the waiting message. Must run on the UI goroutine.
+// clearPlaceholder removes the waiting message. UI goroutine only.
 func (l *Log) clearPlaceholder() {
 	if l.placeholder {
 		l.placeholder = false
@@ -232,8 +224,7 @@ func (l *Log) clearPlaceholder() {
 
 // LogCleared clears the logs.
 func (l *Log) LogCleared() {
-	// Routed through the feed so a clear can never race with (and wipe)
-	// the lines that follow it.
+	// Route through the feed: never wipe lines queued after the clear.
 	l.feed.reset()
 	l.scheduleFeed()
 }
@@ -260,8 +251,7 @@ func (l *Log) drainFeed() {
 		l.clearPlaceholder()
 		l.Flush(lines)
 	}
-	// Queued behind the draw triggered by this update, so it measures the
-	// full update+draw cost, which paces the next update.
+	// Queue behind the draw to measure update+draw cost for pacing.
 	l.app.QueueUpdate(func() {
 		l.feed.done(time.Since(start))
 		l.scheduleFeed()
@@ -287,7 +277,7 @@ func (l *Log) LogChanged(lines [][]byte) {
 
 // BufferCompleted indicates input was accepted.
 func (l *Log) BufferCompleted(text, _ string) {
-	// Called from the command buffer's debounce goroutine.
+	// Runs on the command buffer debounce goroutine.
 	l.model.Filter(text)
 	l.app.QueueUpdateDraw(l.updateTitle)
 }
@@ -476,8 +466,7 @@ func (l *Log) Flush(lines [][]byte) {
 	if l.requestOneRefresh {
 		l.requestOneRefresh = false
 	}
-	// One write per batch: each Write goes through the ANSI parser and the
-	// TextView lock, so batching is much cheaper on chatty streams.
+	// Write once per batch: each Write costs an ANSI parse and a lock.
 	_, _ = l.ansiWriter.Write(bytes.Join(lines, nil))
 	if l.follow {
 		if l.columnLock {

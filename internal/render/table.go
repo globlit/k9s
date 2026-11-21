@@ -96,7 +96,7 @@ func (t *Table) Render(o any, ns string, r *model1.Row) error {
 		return nil
 	}
 
-	// realize only reads the object: no need to copy it.
+	// realize only reads the object: skip the copy.
 	cols, err := t.specs.realize(row.Object.Object, t.defaultHeader(), r)
 	cols.hydrateRow(r)
 

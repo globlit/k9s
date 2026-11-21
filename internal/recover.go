@@ -8,9 +8,8 @@ import (
 	"runtime/debug"
 )
 
-// LogPanic recovers from a panic in a long-lived background goroutine and
-// logs it with a stack trace instead of crashing the whole application.
-// It must be called directly via defer: `defer internal.LogPanic("updater")`.
+// LogPanic recovers and logs background goroutine panics with a stack.
+// Defer it directly: `defer internal.LogPanic("updater")`.
 func LogPanic(where string) {
 	if r := recover(); r != nil {
 		slog.Error("Recovered from panic in background goroutine",

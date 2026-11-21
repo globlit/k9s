@@ -124,8 +124,7 @@ func (v *RevValues) Refresh(ctx context.Context) error {
 
 // Watch watches for Values changes.
 func (v *RevValues) Watch(ctx context.Context) error {
-	// Values are fetched once (and again on toggle/refresh): polling would
-	// only redraw identical content and reset the search position.
+	// Fetch once, then on toggle or refresh: polling resets the search position.
 	if err := v.refresh(ctx); err != nil {
 		return err
 	}

@@ -221,8 +221,7 @@ func (d *Dir) applyCmd(evt *tcell.EventKey) *tcell.EventKey {
 	return nil
 }
 
-// runManifestCmd runs kubectl off the UI goroutine (apply/delete of large
-// manifests can take a while) and shows the outcome when done.
+// runManifestCmd runs kubectl off the UI goroutine and shows the outcome.
 func (d *Dir) runManifestCmd(title, sel string, args []string) {
 	d.Stop()
 	d.App().Flash().Infof("Running kubectl %s on %s...", args[0], sel)

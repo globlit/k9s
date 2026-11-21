@@ -32,8 +32,7 @@ func TestUpdateLogs(t *testing.T) {
 	for i := range 2 * size {
 		c <- dao.NewLogItemFromString("line" + strconv.Itoa(i))
 	}
-	// Every flush delivers new lines promptly: at least a full buffer's worth
-	// reaches the view and the very last line is never lost.
+	// Expect at least a full buffer, and never lose the last line.
 	assert.Eventually(t, func() bool {
 		return strings.Contains(v.getLast(), "line"+strconv.Itoa(2*size-1))
 	}, 2*time.Second, 10*time.Millisecond)
@@ -110,8 +109,7 @@ func (*mockLogView) LogResume()      {}
 func (*mockLogView) LogCleared()     {}
 func (*mockLogView) LogFailed(error) {}
 
-// A chatty stream that never pauses for flushTimeout must still reach the
-// view while it is flowing (it used to only flush after a lull).
+// Flush streams with no lulls while they flow.
 func TestUpdateLogsSteadyStreamFlushes(t *testing.T) {
 	m := NewLog(client.NewGVR("fred"), makeLogOpts(1000), 50*time.Millisecond)
 	m.Init(makeFactory())
@@ -130,6 +128,6 @@ func TestUpdateLogsSteadyStreamFlushes(t *testing.T) {
 		i++
 		time.Sleep(5 * time.Millisecond)
 	}
-	// Still streaming: lines must have been flushed already.
+	// Still streaming: expect flushed lines.
 	assert.Positive(t, v.getCount())
 }

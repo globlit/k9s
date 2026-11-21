@@ -32,7 +32,7 @@ type LogItems struct {
 	items     []*LogItem
 	podColors podColors
 	mx        sync.RWMutex
-	// colorMx guards podColors so renders can run under a read lock.
+	// colorMx guards podColors; renders hold a read lock only.
 	colorMx sync.Mutex
 }
 
@@ -145,8 +145,7 @@ func (l *LogItems) podColorFor(id string) string {
 	return color
 }
 
-// renderLocked renders items from index into ll. Caller must hold l.mx.
-// At most len(ll) lines are rendered.
+// renderLocked renders up to len(ll) items from index. Caller holds l.mx.
 func (l *LogItems) renderLocked(index int, showTime bool, ll [][]byte) {
 	if index < 0 || index > len(l.items) {
 		return
@@ -161,8 +160,7 @@ func (l *LogItems) renderLocked(index int, showTime bool, ll [][]byte) {
 	}
 }
 
-// RenderFrom renders all lines starting at index. The result is sized
-// under the same lock as the render so it cannot race with concurrent appends.
+// RenderFrom renders lines from index. Size and render under one lock.
 func (l *LogItems) RenderFrom(index int, showTime bool) [][]byte {
 	l.mx.RLock()
 	defer l.mx.RUnlock()
@@ -218,8 +216,8 @@ func (l *LogItems) Filter(index int, q string, showTime bool) (matches []int, in
 	return
 }
 
-// FilterLines filters log items from index and returns the rendered lines the
-// matches refer to, so callers never index into a buffer that moved meanwhile.
+// FilterLines filters items from index and returns matched rendered lines.
+// Callers never index into a moved buffer.
 func (l *LogItems) FilterLines(index int, q string, showTime bool) (lines [][]byte, matches []int, indices [][]int, err error) {
 	if q == "" {
 		return

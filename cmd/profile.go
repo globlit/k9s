@@ -19,20 +19,17 @@ import (
 )
 
 const (
-	// envCPUProfile writes a CPU profile of the session to the given path,
-	// e.g. to refresh default.pgo from real usage.
+	// envCPUProfile names the session CPU profile output path.
 	envCPUProfile = "K9S_CPUPROFILE"
-	// envPprofAddr serves net/http/pprof on a loopback address.
+	// envPprofAddr names the loopback address serving net/http/pprof.
 	envPprofAddr = "K9S_PPROF_ADDR"
 
-	// defaultMemoryLimit is the soft memory limit used when GOMEMLIMIT is
-	// not set: the GC works harder near it instead of letting garbage grow
-	// the heap during long sessions.
+	// defaultMemoryLimit sets the soft memory limit when GOMEMLIMIT is unset.
 	defaultMemoryLimit = 2 << 30
 )
 
-// startProfiling enables the opt-in profiling switches. The returned func
-// flushes them; it is also registered to run on BailOut, which os.Exits.
+// startProfiling enables opt-in profiling and returns a flush func.
+// BailOut calls os.Exit, so also register the flush as an exit hook.
 func startProfiling() func() {
 	var stops []func()
 
@@ -68,8 +65,7 @@ func startProfiling() func() {
 	return stop
 }
 
-// servePprof serves pprof only on a loopback address: profiles expose
-// memory contents (tokens, secrets) and must never be reachable remotely.
+// servePprof serves pprof on loopback only: profiles expose memory contents.
 func servePprof(addr string) {
 	if !isLoopbackAddr(addr) {
 		slog.Warn("Refusing pprof on a non-loopback address", slogs.Address, addr)
@@ -104,8 +100,7 @@ func isLoopbackAddr(addr string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
-// applyMemoryLimit sets a default soft memory limit unless the user set
-// GOMEMLIMIT (including "off"), which the Go runtime already honours.
+// applyMemoryLimit sets the default soft memory limit unless GOMEMLIMIT is set.
 func applyMemoryLimit() {
 	if _, ok := os.LookupEnv("GOMEMLIMIT"); ok {
 		slog.Debug("Memory limit from GOMEMLIMIT", "limit", debug.SetMemoryLimit(-1))

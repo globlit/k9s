@@ -323,7 +323,7 @@ func (p *Pod) transferCmd(*tcell.EventKey) *tcell.EventKey {
 		}
 
 		fqn := path + ":" + args.CO
-		// Transfers can take minutes: never block the UI goroutine on them.
+		// Copy off the UI goroutine: transfers may take minutes.
 		p.App().Flash().Infof("%s started on %s...", op, fqn)
 		go func() {
 			defer internal.LogPanic("transfer")

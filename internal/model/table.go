@@ -97,7 +97,7 @@ func (t *Table) AddListener(l TableListener) {
 	t.mx.Lock()
 	defer t.mx.Unlock()
 
-	// Copy on write: fire* iterate a snapshot of the slice outside the lock.
+	// Copy on write: fire* iterate a snapshot off-lock.
 	ll := make([]TableListener, 0, len(t.listeners)+1)
 	ll = append(ll, t.listeners...)
 	t.listeners = append(ll, l)
@@ -275,8 +275,7 @@ func (t *Table) reconcile(ctx context.Context) error {
 	t.mx.RLock()
 	vs := t.vs
 	t.mx.RUnlock()
-	// Full objects are only needed to evaluate custom columns: asking the API
-	// server for them otherwise multiplies the payload for nothing.
+	// Request full objects for custom columns only: they inflate payloads.
 	if vs != nil && vs.HasCols() {
 		meta.DAO.SetIncludeObject(true)
 	}

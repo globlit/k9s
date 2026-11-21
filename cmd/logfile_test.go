@@ -30,7 +30,7 @@ func TestRotatingFile(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "12345678\n", string(prev))
 
-	// An oversized log left by a previous run is rotated at startup.
+	// Rotate oversized logs from previous runs at startup.
 	require.NoError(t, os.WriteFile(path, []byte("0123456789ABC"), 0o600))
 	r, err = openRotatingFile(path, 10)
 	require.NoError(t, err)

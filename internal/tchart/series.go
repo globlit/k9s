@@ -65,7 +65,7 @@ func (mm MetricSeries) Keys() Times {
 	return kk
 }
 
-// Truncate keeps the size most recent entries.
+// Truncate keeps the latest size entries.
 func (mm MetricSeries) Truncate(size int) {
 	if size < 0 {
 		size = 0

@@ -75,10 +75,8 @@ func SaveYAML(path string, content any) error {
 	return WriteFileAtomic(path, bb, DefaultFileMod)
 }
 
-// WriteFileAtomic writes bb to a temp file in the same directory, syncs it
-// and renames it over path, so a crash, a full disk, or a concurrent k9s
-// instance can never leave a truncated or interleaved file behind.
-// Symlinks are resolved first (dotfiles setups) so the link itself survives.
+// WriteFileAtomic writes bb to a synced temp file, then renames it over path.
+// Resolve symlinks first to keep links intact.
 func WriteFileAtomic(path string, bb []byte, mod os.FileMode) (err error) {
 	if p, e := filepath.EvalSymlinks(path); e == nil {
 		path = p

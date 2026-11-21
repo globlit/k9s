@@ -41,9 +41,7 @@ func resourceMeta(gvr *client.GVR) ResourceMeta {
 	if meta.DAO == nil {
 		meta.DAO = new(dao.Resource)
 	}
-	// Registry entries are shared singletons, but callers mutate them (Init,
-	// SetIncludeObject, SetViewSetting) from concurrent refresh goroutines.
-	// Hand out private instances instead.
+	// Return private instances: callers mutate registry entries concurrently.
 	meta.DAO = freshInstance(meta.DAO)
 	meta.Renderer = freshInstance(meta.Renderer)
 	meta.TreeRenderer = freshInstance(meta.TreeRenderer)
@@ -51,9 +49,8 @@ func resourceMeta(gvr *client.GVR) ResourceMeta {
 	return meta
 }
 
-// freshInstance returns a new zero instance of v's concrete type. Registry
-// entries are zero values except for embedded struct pointers (e.g.
-// render.NewPod), so those are allocated to match.
+// freshInstance returns a zero instance of v's concrete type, allocating
+// embedded struct pointers like registry entries do (e.g. render.NewPod).
 func freshInstance[T any](v T) T {
 	rv := reflect.ValueOf(v)
 	if !rv.IsValid() || rv.Kind() != reflect.Pointer || rv.IsNil() || rv.Elem().Kind() != reflect.Struct {

@@ -26,17 +26,16 @@ import (
 )
 
 const (
-	// cacheFormat is bumped whenever the on-disk layout changes.
+	// cacheFormat versions the disk layout. Bump on change.
 	cacheFormat = 1
 
-	// tagTTL bounds how long the SBOM of a tag ref is trusted: tags are
-	// mutable, digests are not.
+	// tagTTL bounds tag ref SBOM age: tags are mutable, digests are not.
 	tagTTL = 24 * time.Hour
 
-	// cacheMaxAge evicts entries nobody used for that long.
+	// cacheMaxAge evicts entries unused for that long.
 	cacheMaxAge = 30 * 24 * time.Hour
 
-	// cacheMaxBytes caps the cache size, oldest entries go first.
+	// cacheMaxBytes caps the cache size. Evict oldest first.
 	cacheMaxBytes int64 = 1 << 30
 
 	cacheDirMod  os.FileMode = 0o700
@@ -46,32 +45,30 @@ const (
 	resultExt = ".result.json"
 )
 
-// dbStamp identifies a vulnerability DB build. Results are only reused
-// against the very DB they were matched with.
+// dbStamp identifies a vulnerability DB build. Reuse results on the same
+// build only.
 type dbStamp struct {
 	Built  time.Time
 	Schema string
 }
 
-// cachedResult is the on-disk form of a scan.
+// cachedResult holds a serialized scan.
 type cachedResult struct {
 	Format     int       `json:"v"`
 	Image      string    `json:"image"`
 	DBBuilt    time.Time `json:"dbBuilt"`
 	DBSchema   string    `json:"dbSchema"`
 	K9sVersion string    `json:"k9sVersion"`
-	// SBOMAt is when the image was cataloged, results of a tag ref expire
-	// with its SBOM.
+	// SBOMAt holds the catalog time. Tag ref results expire with the SBOM.
 	SBOMAt time.Time `json:"sbomAt"`
 	Rows   []Row     `json:"rows"`
 }
 
-// scanCache persists SBOMs and scan results across k9s sessions, so a
-// restart neither re-pulls nor re-scans unchanged images. Two levels:
-//   - the SBOM (expensive: image pull + cataloging), reusable against any DB;
-//   - the result, only valid for the DB build and k9s version it came from.
+// scanCache persists scans across sessions, on two levels:
+//   - SBOM: image pull + cataloging, valid for any DB;
+//   - result: valid for one DB build and k9s version.
 //
-// A nil cache is valid and caches nothing.
+// Nil caches nothing.
 type scanCache struct {
 	dir     string
 	version string
@@ -179,7 +176,7 @@ func (c *scanCache) saveResult(img string, db dbStamp, sbomAt time.Time, sc *Sca
 	}
 }
 
-// loadSBOM returns a still fresh syft-json SBOM and when it was cataloged.
+// loadSBOM returns a fresh syft-json SBOM and its catalog time.
 func (c *scanCache) loadSBOM(img string) ([]byte, time.Time, bool) {
 	if c == nil {
 		return nil, time.Time{}, false
@@ -196,8 +193,7 @@ func (c *scanCache) loadSBOM(img string) ([]byte, time.Time, bool) {
 		c.drop(p, err)
 		return nil, time.Time{}, false
 	}
-	// The gzip header carries the image ref and the catalog time: mtimes
-	// are refreshed on every hit.
+	// Read ref and catalog time from the gzip header: hits refresh mtimes.
 	at := zr.ModTime
 	if zr.Name != img {
 		return nil, time.Time{}, false
@@ -242,8 +238,8 @@ func (c *scanCache) saveSBOM(img string, s *sbom.SBOM, at time.Time) {
 	}
 }
 
-// evict removes stale temp files, entries unused for cacheMaxAge, then the
-// least recently used ones until the cache fits in maxBytes.
+// evict removes stale temp files and entries unused for cacheMaxAge, then
+// evicts LRU entries down to maxBytes.
 func (c *scanCache) evict() {
 	if c == nil {
 		return

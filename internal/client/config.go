@@ -48,9 +48,8 @@ type Config struct {
 	proxyMx sync.RWMutex
 	proxy   func(*http.Request) (*url.URL, error)
 
-	// CLI credential overrides (--token, --insecure-skip-tls-verify) belong
-	// to the context k9s was started on. They must not follow a context
-	// switch, or the token would be sent to another API server.
+	// Apply CLI credential overrides to the startup context only: never send
+	// the token to another API server.
 	credsCtx           string
 	credsSaved         bool
 	bearerToken        *string
@@ -233,8 +232,7 @@ func (c *Config) GetContext(n string) (*api.Context, error) {
 	return nil, fmt.Errorf("getcontext - invalid context specified: %q", n)
 }
 
-// SetProxy sets the proxy function. A nil proxy restores the default
-// (environment) proxy settings.
+// SetProxy sets the proxy func. Nil restores environment proxy settings.
 func (c *Config) SetProxy(proxy func(*http.Request) (*url.URL, error)) {
 	c.proxyMx.Lock()
 	defer c.proxyMx.Unlock()

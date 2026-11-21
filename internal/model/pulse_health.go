@@ -104,7 +104,7 @@ func (h *PulseHealth) checkPulse(ctx context.Context, ns string, c HealthChan) e
 		if err != nil {
 			return err
 		}
-		// The consumer may have gone away: never block past cancellation.
+		// Never block past cancellation.
 		select {
 		case c <- check:
 		case <-ctx.Done():

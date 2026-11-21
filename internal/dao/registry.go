@@ -109,9 +109,8 @@ func (m *Meta) GVK2GVR(gv schema.GroupVersion, kind string) (*client.GVR, bool, 
 	return client.NoGVR, false, false
 }
 
-// GK2GVR resolves a group and kind to the server preferred resource, for
-// references that carry no API version (e.g. Flux sourceRefs). Only
-// preferred versions are registered, so the match is unambiguous.
+// GK2GVR resolves a group and kind to the preferred resource, for
+// version-less references such as Flux sourceRefs.
 func (m *Meta) GK2GVR(group, kind string) (*client.GVR, bool) {
 	m.mx.RLock()
 	defer m.mx.RUnlock()
@@ -171,9 +170,8 @@ func IsScalable(m *metav1.APIResource) bool {
 
 // LoadResources hydrates server preferred+CRDs resource metadata.
 func (m *Meta) LoadResources(f Factory) error {
-	// Build the new registry off-lock and swap it in: readers (command
-	// prompt, views) never block on discovery, and a failed reload keeps the
-	// previous registry instead of leaving it empty.
+	// Build off-lock, then swap: readers never block on discovery and failed
+	// reloads keep the previous registry.
 	metas := make(ResourceMetas)
 	if err := loadPreferred(f, metas); err != nil {
 		return err
@@ -410,8 +408,7 @@ func loadCRDs(f Factory, m ResourceMetas) {
 	}
 }
 
-// crdSummary extracts the few CRD fields k9s needs. Reloads happen
-// periodically and a full typed conversion would decode every OpenAPI schema.
+// crdSummary extracts needed CRD fields only: skip decoding OpenAPI schemas.
 func crdSummary(u *unstructured.Unstructured) apiext.CustomResourceDefinition {
 	var crd apiext.CustomResourceDefinition
 	crd.Spec.Group, _, _ = unstructured.NestedString(u.Object, "spec", "group")

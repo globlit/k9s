@@ -13,9 +13,8 @@ import (
 
 type promptAction func(ctx context.Context)
 
-// ShowPrompt pops a prompt dialog. The action runs in a background goroutine;
-// queue is used to dismiss the dialog on the UI goroutine once the action
-// completes (tview is not thread safe). A nil queue dismisses inline.
+// ShowPrompt pops a prompt and runs action in the background. Dismiss
+// through queue on the UI goroutine, or inline when queue is nil.
 func ShowPrompt(styles *config.Dialog, pages *ui.Pages, queue func(func()), title, msg string, action promptAction, cancel cancelFunc) {
 	if queue == nil {
 		queue = func(f func()) { f() }

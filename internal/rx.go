@@ -15,11 +15,8 @@ var rxCache = struct {
 	m map[string]*regexp.Regexp
 }{m: make(map[string]*regexp.Regexp, rxCacheSize)}
 
-// CompileFilterRx compiles a case-insensitive user filter. Compiled
-// expressions are cached so hot paths (per row, per log line, per tree node)
-// don't recompile on every call. When q is not a valid regular expression it
-// falls back to a literal match and returns ok=false, so a stray `[` or `(`
-// typed by a user can never crash the app.
+// CompileFilterRx compiles and caches a case-insensitive user filter.
+// Invalid regexes fall back to a literal match with ok=false.
 func CompileFilterRx(q string) (rx *regexp.Regexp, ok bool) {
 	rxCache.Lock()
 	defer rxCache.Unlock()

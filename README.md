@@ -1421,10 +1421,9 @@ k9s:
     limits:
       cpu: 100m
       memory: 100Mi
-  # Vulnerability scans are cached across sessions in $XDG_CACHE_HOME/k9s/vul-scans
-  # ($K9S_CONFIG_DIR/vul-scans when set): image SBOMs (digest refs: kept, tag refs: 24h)
-  # and results (until the vulnerability DB updates). Unused entries go after 30 days,
-  # the cache is capped at 1GiB. Delete the directory to force fresh scans.
+  # Scans persist in $XDG_CACHE_HOME/k9s/vul-scans ($K9S_CONFIG_DIR/vul-scans if set).
+  # SBOMs: digest refs kept, tag refs 24h. Results: until the DB updates.
+  # Evicts entries unused for 30 days, caps at 1GiB. Delete the dir to rescan.
   imageScans:
     enable: false
     exclusions:

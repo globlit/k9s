@@ -64,8 +64,7 @@ func (a *App) Init() {
 	a.SetRoot(a.Main, true).EnableMouse(a.Config.K9s.UI.EnableMouse)
 }
 
-// QueueUpdate queues up a ui action. Updates run in order on the UI
-// goroutine; the call never blocks.
+// QueueUpdate queues a UI action. Updates run in order; never blocks.
 func (a *App) QueueUpdate(f func()) {
 	if a.Application == nil {
 		return
@@ -73,8 +72,7 @@ func (a *App) QueueUpdate(f func()) {
 	a.dispatch.enqueue(a.Application, uiUpdate{f: f})
 }
 
-// QueueUpdateDraw queues up a ui action and redraw the ui. Bursts of
-// updates are applied together and drawn once.
+// QueueUpdateDraw queues a UI action and a redraw. Bursts draw once.
 func (a *App) QueueUpdateDraw(f func()) {
 	if a.Application == nil {
 		return

@@ -102,7 +102,7 @@ func (p *PortForwarder) Container() string {
 }
 
 // Stop terminates a port forward.
-// It is safe to call Stop multiple times and from multiple goroutines.
+// Safe to call repeatedly and concurrently.
 func (p *PortForwarder) Stop() {
 	p.active.Store(false)
 	p.stopOnce.Do(func() {

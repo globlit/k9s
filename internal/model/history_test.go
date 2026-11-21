@@ -30,7 +30,7 @@ func TestHistoryPush(t *testing.T) {
 	h.Push("cmd1")
 	h.Push("")
 
-	// Full: the oldest entry is evicted to make room.
+	// Full: evict the oldest entry.
 	assert.Equal(t, []string{"cmd2", "cmd3", "cmd1"}, h.List())
 	c, ok := h.Top()
 	assert.True(t, ok)

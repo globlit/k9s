@@ -223,9 +223,8 @@ func (t *Tree) reconcile(ctx context.Context) error {
 	}
 
 	root.Sort()
-	// Keep the unfiltered tree: views apply the filter themselves (and re-run
-	// it on Peek). Diffing a filtered tree against an unfiltered one would
-	// report a change, and redraw, on every tick.
+	// Keep the tree unfiltered: views filter it. Diffing filtered against
+	// unfiltered trees redraws on every tick.
 	if t.root == nil || t.root.Diff(root) {
 		t.root = root
 		t.fireTreeChanged(t.root)
@@ -273,10 +272,8 @@ func treeHydrate(ctx context.Context, ns string, oo []runtime.Object, re TreeRen
 		return fmt.Errorf("expecting a TreeNode but got %T", ctx.Value(xray.KeyParent))
 	}
 
-	// Renderers find-or-create namespace nodes on their parent and append to
-	// it. Doing that concurrently on one shared root loses or duplicates
-	// nodes, so each object renders into its own scratch root and the
-	// results are merged sequentially afterwards.
+	// Render each object into its own root, then merge sequentially: renderers
+	// find-or-create parent nodes and race on a shared root.
 	scratch := make([]*xray.TreeNode, len(oo))
 	pool := internal.NewWorkerPool(ctx, internal.DefaultPoolSize)
 	for i, o := range oo {
@@ -297,8 +294,7 @@ func treeHydrate(ctx context.Context, ns string, oo []runtime.Object, re TreeRen
 	return nil
 }
 
-// mergeTree moves src's children under dst, folding nodes that share the
-// same identity (e.g. a namespace node created by several objects).
+// mergeTree moves src children under dst, folding nodes with equal identity.
 func mergeTree(dst, src *xray.TreeNode) {
 	if src == nil {
 		return

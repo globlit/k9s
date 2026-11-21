@@ -304,14 +304,11 @@ func jqParse(spec string, o map[string]any) (string, bool) {
 	return strings.Join(rr, ","), true
 }
 
-// compiledSpec holds the parsed forms of a custom column spec. Parsing is
-// expensive and specs are evaluated for every row and column on each
-// refresh, so each spec is parsed once and reused.
+// compiledSpec caches parsed custom column specs: parsing per cell is costly.
 type compiledSpec struct {
-	// jq is safe for concurrent use; nil if the spec is not a valid JQ expression.
+	// jq is safe for concurrent use. Nil for invalid JQ specs.
 	jq *gojq.Code
-	// jps hands out parsed JSONPath evaluators, which carry evaluation state
-	// and so cannot be shared between goroutines.
+	// jps pools JSONPath evaluators: they hold state, so never share them.
 	jps sync.Pool
 }
 

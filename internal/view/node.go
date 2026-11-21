@@ -124,8 +124,7 @@ func drainNode(v ResourceViewer, sels []string, opts dao.DrainOptions) {
 	if err := v.App().inject(d, false); err != nil {
 		v.App().Flash().Err(err)
 	}
-	// Draining evicts pods one by one and can take minutes (or forever with
-	// no timeout): never do it on the UI goroutine.
+	// Drain off the UI goroutine: evictions may take minutes.
 	w := &drawWriter{w: d.GetWriter(), app: v.App()}
 	go func() {
 		defer internal.LogPanic("node drain")
@@ -141,7 +140,7 @@ func drainNode(v ResourceViewer, sels []string, opts dao.DrainOptions) {
 	}()
 }
 
-// drawWriter writes to a goroutine-safe text view and asks the UI to redraw.
+// drawWriter writes to a thread-safe text view and requests a redraw.
 type drawWriter struct {
 	w   io.Writer
 	app *App

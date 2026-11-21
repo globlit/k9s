@@ -28,9 +28,8 @@ const (
 	defaultResync   = 10 * time.Minute
 	defaultWaitTime = 500 * time.Millisecond
 
-	// factoryIdleTTL is how long an unused namespace's informers are kept
-	// before being stopped. Without it every namespace visited during the
-	// day keeps its watches (and a full copy of its objects) open.
+	// factoryIdleTTL bounds idle namespace informer lifetime: each one keeps
+	// watches and an object copy open.
 	factoryIdleTTL     = 10 * time.Minute
 	factoryJanitorTick = time.Minute
 )
@@ -89,8 +88,7 @@ func (f *Factory) Terminate() {
 	f.forwarders.DeleteAll()
 }
 
-// stopFor returns the stop channel of a namespace's informers.
-// Callers must hold f.mx.
+// stopFor returns a namespace informers stop channel. Caller holds f.mx.
 func (f *Factory) stopFor(ns string) chan struct{} {
 	c, ok := f.stops[ns]
 	if !ok {
@@ -101,8 +99,7 @@ func (f *Factory) stopFor(ns string) chan struct{} {
 	return c
 }
 
-// dropFactoryLocked stops and forgets a namespace's informers.
-// Callers must hold f.mx.
+// dropFactoryLocked stops and forgets namespace informers. Caller holds f.mx.
 func (f *Factory) dropFactoryLocked(ns string) {
 	if c, ok := f.stops[ns]; ok {
 		close(c)
@@ -129,8 +126,7 @@ func (f *Factory) janitor(stop <-chan struct{}) {
 	}
 }
 
-// evictIdle stops informers of namespaces not used for longer than ttl.
-// The active namespace is always kept.
+// evictIdle stops informers of namespaces idle past ttl. Keep the active one.
 func (f *Factory) evictIdle(now time.Time, ttl time.Duration) {
 	f.mx.Lock()
 	defer f.mx.Unlock()
@@ -353,8 +349,8 @@ func (f *Factory) CanForInstance(fqn string, gvr *client.GVR, verbs []string) (i
 
 // ForResource returns an informer for a given resource.
 func (f *Factory) ForResource(ns string, gvr *client.GVR) (informers.GenericInformer, error) {
-	// A synced cluster-wide informer already holds every namespace's objects:
-	// serve namespaced reads from it rather than caching them a second time.
+	// Serve namespaced reads from a synced cluster-wide informer: skip a
+	// second cache.
 	if !client.IsClusterWide(ns) {
 		if inf, ok := f.clusterWideInformer(gvr); ok {
 			return inf, nil
@@ -373,7 +369,7 @@ func (f *Factory) ForResource(ns string, gvr *client.GVR) (informers.GenericInfo
 		)
 		return inf, nil
 	}
-	// Must happen before the informer starts; later calls are no-ops.
+	// Set before start: later calls are no-ops.
 	tx := stripManagedFields
 	if gvr == client.CrdGVR {
 		tx = stripCRDSchemas
@@ -386,8 +382,7 @@ func (f *Factory) ForResource(ns string, gvr *client.GVR) (informers.GenericInfo
 		f.cwInfs[gvr] = inf
 		ns = client.BlankNamespace
 	}
-	// The factory may have been evicted meanwhile; only start informers
-	// that are still tracked so they can be stopped later.
+	// Start tracked informers only: eviction may have dropped the factory.
 	if cur, ok := f.factories[ns]; ok && cur == fact {
 		fact.Start(f.stopFor(ns))
 	}
@@ -454,9 +449,8 @@ func (f *Factory) DeleteForwarder(path string) {
 	)
 }
 
-// RemoveForwarder stops and removes the given forwarder only if it is still
-// the registered one for its ID. This keeps a finished forward from tearing
-// down a newer forward that reused the same ID.
+// RemoveForwarder stops and removes fw if still registered for its ID.
+// Never tear down a newer forward reusing the ID.
 func (f *Factory) RemoveForwarder(pf Forwarder) {
 	f.mx.Lock()
 	defer f.mx.Unlock()
@@ -467,8 +461,7 @@ func (f *Factory) RemoveForwarder(pf Forwarder) {
 	pf.Stop()
 }
 
-// Forwarders returns a snapshot of all portforwards.
-// The returned map is a copy and is safe to iterate concurrently.
+// Forwarders returns a snapshot copy of all port-forwards.
 func (f *Factory) Forwarders() Forwarders {
 	f.mx.RLock()
 	defer f.mx.RUnlock()
@@ -496,12 +489,10 @@ func (f *Factory) ValidatePortForwards() {
 			continue
 		}
 		paths := strings.Split(tokens[0], "|")
-		// wait=true falls back to the api server when the cache is cold so a
-		// not-found answer is authoritative.
+		// wait=true falls back to the API server on cold caches: trust not-found.
 		o, err := f.Get(client.PodGVR, paths[0], true, labels.Everything())
 		if err != nil {
-			// Only reap the forward if the pod is truly gone. Transient errors
-			// (cold cache, RBAC hiccups, network) must not kill active forwards.
+			// Reap only when the pod is gone: ignore transient errors.
 			if apierrors.IsNotFound(err) {
 				stale[k] = fwd
 			}
@@ -526,7 +517,7 @@ func (f *Factory) ValidatePortForwards() {
 	f.mx.Lock()
 	defer f.mx.Unlock()
 	for k, fwd := range stale {
-		// Skip if the forward was replaced while we were validating.
+		// Skip forwards replaced during validation.
 		if cur, ok := f.forwarders[k]; !ok || cur != fwd {
 			continue
 		}
@@ -535,10 +526,8 @@ func (f *Factory) ValidatePortForwards() {
 	}
 }
 
-// stripManagedFields drops metadata.managedFields from cached objects. They
-// are often the largest part of an object (30-50%), k9s never reads them from
-// the cache, and views that show them fetch the live object instead. A nil
-// managedFields on a later update means "unchanged" to the API server.
+// stripManagedFields drops managedFields from cached objects: 30-50% of
+// object size, never read from cache. Views needing them fetch live.
 func stripManagedFields(o any) (any, error) {
 	if u, ok := o.(*unstructured.Unstructured); ok && u.Object != nil {
 		if meta, ok := u.Object["metadata"].(map[string]any); ok {
@@ -549,9 +538,8 @@ func stripManagedFields(o any) (any, error) {
 	return o, nil
 }
 
-// stripCRDSchemas also drops the OpenAPI schemas of cached CRDs: they are by
-// far the largest objects on most clusters (hundreds of MB with some
-// operators) and k9s never reads them from the cache.
+// stripCRDSchemas drops OpenAPI schemas from cached CRDs: largest objects
+// on most clusters, never read from cache.
 func stripCRDSchemas(o any) (any, error) {
 	o, _ = stripManagedFields(o)
 	u, ok := o.(*unstructured.Unstructured)

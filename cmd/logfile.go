@@ -10,11 +10,10 @@ import (
 	"github.com/derailed/k9s/internal/config/data"
 )
 
-// maxLogSize caps k9s.log; the previous log is kept as k9s.log.1.
+// maxLogSize caps k9s.log. Rotation keeps one backup, k9s.log.1.
 const maxLogSize = 50 * 1024 * 1024
 
-// rotatingFile is an append-only log file that rotates once it grows past
-// max bytes, so long sessions (or months of daily use) can't fill the disk.
+// rotatingFile appends to a log file and rotates it past max bytes.
 type rotatingFile struct {
 	mx   sync.Mutex
 	path string
@@ -48,8 +47,8 @@ func (r *rotatingFile) open() error {
 	return nil
 }
 
-// rotate moves the current log aside and starts a new one. On failure it
-// keeps writing to the current file rather than losing logs.
+// rotate moves the log aside and opens a new one. On failure, keep writing
+// to the current file.
 func (r *rotatingFile) rotate() {
 	if err := os.Rename(r.path, r.path+".1"); err != nil {
 		return

@@ -9,20 +9,16 @@ import (
 	"github.com/derailed/tview"
 )
 
-// uiUpdate is a queued UI mutation.
+// uiUpdate holds a queued UI mutation.
 type uiUpdate struct {
 	f    func()
 	draw bool
 }
 
-// dispatcher funnels UI updates to tview from a single goroutine.
+// dispatcher funnels UI updates to tview from one goroutine.
 //
-// tview's QueueUpdate blocks until the UI goroutine has run the update, so
-// callers can't use it directly (they may be the UI goroutine). Spawning a
-// goroutine per update, as k9s used to, loses ordering between updates and
-// costs one full screen draw per update. The dispatcher keeps a FIFO, hands
-// every pending update to tview as one batch and draws at most once per
-// batch.
+// tview QueueUpdate blocks until the UI goroutine runs the update. Keep a
+// FIFO, hand pending updates to tview as one batch, draw once per batch.
 type dispatcher struct {
 	mx      sync.Mutex
 	pending []uiUpdate
@@ -34,7 +30,7 @@ func newDispatcher() *dispatcher {
 	return &dispatcher{wake: make(chan struct{}, 1)}
 }
 
-// enqueue adds an update; it never blocks.
+// enqueue adds an update. Never blocks.
 func (d *dispatcher) enqueue(app *tview.Application, u uiUpdate) {
 	d.once.Do(func() { go d.run(app) })
 

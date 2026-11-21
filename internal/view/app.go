@@ -181,10 +181,9 @@ func (a *App) layout(ctx context.Context) {
 	}
 }
 
-// initSignals shuts k9s down cleanly on SIGHUP/SIGTERM so the terminal is
-// restored and node-shell pods and port-forwards are cleaned up.
-// SIGINT is deliberately not handled here: while k9s runs, Ctrl-C is a key
-// event, and while a shell is suspended it belongs to the child process.
+// initSignals shuts down cleanly on SIGHUP/SIGTERM: restore the terminal,
+// clean up node shells and port-forwards. Leave SIGINT alone: Ctrl-C is a
+// key event, or belongs to the child process.
 func (a *App) initSignals() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGHUP, syscall.SIGTERM)
@@ -200,7 +199,7 @@ func (a *App) initSignals() {
 		select {
 		case <-done:
 		case <-time.After(3 * time.Second):
-			// The event loop is not processing updates (e.g. suspended).
+			// Event loop idle, e.g. suspended.
 			slog.Warn("Forced exit: UI did not shut down in time")
 			ui.RunExitHooks()
 			os.Exit(0)
@@ -383,9 +382,8 @@ func (a *App) clusterUpdater(ctx context.Context) {
 	}
 
 	bf := model.NewExpBackOff(ctx, clusterRefresh, 2*time.Minute)
-	// Check right away, then keep checking. A failed check (e.g. VPN
-	// reconnecting right after a shell session) must back off and retry, not
-	// stop health checks for the rest of the session.
+	// Check now, then periodically. Back off and retry on failure, e.g. VPN
+	// reconnects.
 	var delay time.Duration
 	for {
 		select {
@@ -419,13 +417,12 @@ func (a *App) refreshCluster(context.Context) error {
 			atomic.StoreInt32(&a.conRetry, 0)
 			a.Status(model.FlashInfo, "K8s connectivity OK")
 			if c != nil {
-				// Views are tview primitives: mutate them on the UI goroutine.
+				// Mutate views on the UI goroutine.
 				a.QueueUpdateDraw(c.Start)
 			}
 		} else {
-			// Don't clear the flash: messages expire on their own, and this
-			// runs every check, wiping whatever was just reported (e.g. an
-			// auth plugin URL captured during this very request).
+			// Keep the flash: messages expire, and clearing wipes fresh reports
+			// such as auth plugin URLs.
 			a.ClearStatus(false)
 		}
 		a.factory.ValidatePortForwards()
@@ -564,7 +561,7 @@ func (a *App) BailOut(exitCode int) {
 	a.stopImgScanner()
 	a.factory.Terminate()
 	if ExitStatus != "" {
-		// Restore the terminal first so the reason is actually visible.
+		// Restore the terminal first to show the reason.
 		a.App.Stop()
 		fmt.Fprintln(ui.RealStderr(), ExitStatus)
 	}
@@ -592,8 +589,7 @@ func (a *App) Run() error {
 		return err
 	}
 	a.SetRunning(true)
-	// While the TUI draws, keep stray stderr output (e.g. an OIDC exec
-	// plugin printing a login URL) off the screen and surface it instead.
+	// Keep stray stderr (e.g. OIDC login URLs) off screen and surface it.
 	ui.SetStderrHandler(a.stderrLine)
 	ui.SetStderrCaptured(true)
 	defer ui.SetStderrCaptured(false)
@@ -604,8 +600,7 @@ func (a *App) Run() error {
 	return nil
 }
 
-// stderrLine surfaces captured stderr output, e.g. an auth plugin asking the
-// user to log in through a browser.
+// stderrLine surfaces captured stderr, e.g. auth plugin login prompts.
 func (a *App) stderrLine(line string) {
 	if u, ok := ui.ExtractURL(line); ok {
 		a.Flash().Warnf("Authentication required, open in a browser: %s", u)

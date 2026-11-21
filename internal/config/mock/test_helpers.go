@@ -38,8 +38,7 @@ func EnsureDir(d string) error {
 }
 
 func NewMockConfig(t testing.TB) *config.Config {
-	// Use a per-test directory: a shared /tmp/test was wiped and recreated by
-	// several test packages running in parallel, making tests flaky.
+	// Use a per-test dir: parallel packages wiped a shared /tmp/test.
 	config.AppContextsDir = filepath.Join(t.TempDir(), "test")
 	cl, ct := "cl-1", "ct-1-1"
 	flags := genericclioptions.ConfigFlags{

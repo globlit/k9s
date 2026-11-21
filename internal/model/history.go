@@ -123,7 +123,7 @@ func (h *History) Push(c string) {
 	if h.currentIdx < len(h.commands)-1 {
 		h.commands = h.commands[:h.currentIdx+1]
 	}
-	// Full: drop the oldest entry rather than ignoring new commands.
+	// Full: evict the oldest entry.
 	if len(h.commands) >= h.limit {
 		h.commands = append(h.commands[:0], h.commands[len(h.commands)-h.limit+1:]...)
 	}

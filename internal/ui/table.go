@@ -476,8 +476,7 @@ func (t *Table) UpdateUI(cdata, data *model1.TableData) {
 
 	pads := make(MaxyPad, cdata.HeaderCount())
 	ComputeMaxColumns(pads, t.getSortCol().Name, cdata)
-	// Everything that is constant across rows is computed once here rather
-	// than per cell: on large clusters this loop runs ~100k times per refresh.
+	// Hoist row invariants: this loop runs ~100k times per refresh.
 	h := cdata.Header()
 	rc := rowCtx{
 		h:       h,

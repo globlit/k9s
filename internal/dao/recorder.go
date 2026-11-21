@@ -45,8 +45,8 @@ type Recorder struct {
 	mx     sync.RWMutex
 }
 
-// mxSink delivers metrics to a single watcher. Each Watch gets its own sink
-// so a stale watch can never close or block a newer watcher's channel.
+// mxSink delivers metrics to one watcher. Use one sink per Watch: stale
+// watches must not close or block newer channels.
 type mxSink struct {
 	ch     MetricsChan
 	mx     sync.Mutex
@@ -57,8 +57,7 @@ func newMxSink() *mxSink {
 	return &mxSink{ch: make(MetricsChan, 2)}
 }
 
-// send delivers ts without blocking: if the consumer is slow or gone the
-// point is dropped rather than stalling the producer (and the UI).
+// send delivers ts without blocking. Drop points for slow or gone consumers.
 func (s *mxSink) send(ts TimeSeries) {
 	if s == nil {
 		return

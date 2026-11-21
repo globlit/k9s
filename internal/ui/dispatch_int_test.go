@@ -69,7 +69,7 @@ func TestDispatcherNestedEnqueue(t *testing.T) {
 	var order []string
 	d.enqueue(app, uiUpdate{f: func() {
 		order = append(order, "outer")
-		// Enqueuing from the UI goroutine must not block or deadlock.
+		// Enqueue from the UI goroutine: no block, no deadlock.
 		d.enqueue(app, uiUpdate{f: func() {
 			order = append(order, "inner")
 			done.Done()

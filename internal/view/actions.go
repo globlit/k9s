@@ -99,9 +99,8 @@ func hotKeyActions(r Runner, aa *ui.KeyActions) error {
 	return errs
 }
 
-// hotKeyCmd substitutes env vars ($NAME, $NAMESPACE, ...) when the key is
-// pressed, so they reflect the current selection rather than the one at
-// bind time.
+// hotKeyCmd substitutes env vars ($NAME, $NAMESPACE...) on key press, to
+// match the current selection.
 func hotKeyCmd(r Runner, cmd string, clearStack bool) ui.ActionHandler {
 	return func(*tcell.EventKey) *tcell.EventKey {
 		command := cmd
@@ -135,8 +134,7 @@ func pluginActions(r Runner, aa *ui.KeyActions) error {
 		return err
 	}
 	pp := config.NewPlugins()
-	// Load keeps every valid plugin and reports the invalid ones: one bad
-	// plugin must not disable all of them.
+	// Keep valid plugins and report invalid ones.
 	loadErr := pp.Load(path, true)
 
 	var (
@@ -255,7 +253,7 @@ func executePlugin(r Runner, p *config.Plugin, inputValues dialog.PluginInputVal
 		}
 		go func() {
 			var shown bool
-			// Always drain the channel so the producer never blocks forever.
+			// Always drain the channel: never block the producer.
 			for st := range statusChan {
 				if msg, ok := strings.CutPrefix(st, failedPrefix); ok {
 					r.App().Flash().Errf("Plugin %q failed: %s", p.Description, strings.TrimSpace(msg))

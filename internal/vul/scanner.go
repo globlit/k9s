@@ -52,7 +52,7 @@ type imageScanner struct {
 	log         *slog.Logger
 	cache       *scanCache
 
-	// Seams for tests: grype's image and SBOM providers, and the matcher.
+	// Test seams: image and SBOM providers, matcher.
 	provide     func(string, pkg.ProviderConfig) ([]pkg.Package, pkg.Context, *sbom.SBOM, error)
 	provideSBOM func(io.ReadSeeker, pkg.ProviderConfig) ([]pkg.Package, pkg.Context, *sbom.SBOM, error)
 	match       func([]pkg.Package, pkg.Context, *Scan) error
@@ -160,13 +160,13 @@ func (s *imageScanner) IsInitialized() bool {
 	return s.initialized
 }
 
-// scanSem bounds concurrent scans: each one pulls and unpacks an image.
+// scanSem bounds concurrent scans: each pulls and unpacks an image.
 var scanSem = make(chan struct{}, scanConcurrency)
 
 func (s *imageScanner) Enqueue(_ context.Context, images ...string) {
 	for _, img := range images {
-		// Reserve atomically: tables call this for every row on every
-		// refresh, so 50 replicas of an image must not start 50 scans.
+		// Reserve atomically: tables call this per row per refresh. Scan each
+		// image once.
 		s.mx.Lock()
 		if _, ok := s.scans[img]; ok {
 			s.mx.Unlock()
@@ -187,7 +187,7 @@ func (s *imageScanner) scanWorker(img string) {
 		}
 	}()
 
-	// Results matched against the loaded DB need neither network nor CPU.
+	// Cached results for the loaded DB: no network, no CPU.
 	if sc, ok := s.cache.loadResult(img, s.dbStamp()); ok {
 		s.log.Debug("[Vulscan] cached result", slogs.Image, img)
 		s.setScan(img, sc)
@@ -198,8 +198,7 @@ func (s *imageScanner) scanWorker(img string) {
 	defer func() { <-scanSem }()
 
 	s.log.Debug("ScanWorker processing image", slogs.Image, img)
-	// Fill a private scan and publish it when complete: renderers read
-	// published scans concurrently.
+	// Fill a private scan, publish on completion: renderers read concurrently.
 	sc := newScan(img)
 	if err := s.scan(img, sc); err != nil {
 		s.log.Warn("Scan failed for image",
@@ -221,8 +220,8 @@ func (s *imageScanner) dbStamp() dbStamp {
 	return dbStamp{Built: s.status.Built, Schema: s.status.SchemaVersion}
 }
 
-// scan catalogs the image, from the cached SBOM when there is a fresh one,
-// and matches its packages. Only complete scans are cached.
+// scan catalogs the image, from a fresh cached SBOM if any, then matches
+// packages. Cache complete scans only.
 func (s *imageScanner) scan(img string, sc *Scan) error {
 	defer func(t time.Time) {
 		s.log.Debug("[Vulscan] perf",
@@ -298,8 +297,7 @@ func (s *imageScanner) matchPackages(packages []pkg.Package, pkgCtx pkg.Context,
 }
 
 func getProviderConfig(opts *options.Grype) pkg.ProviderConfig {
-	// Like grype's CLI: packages without a version can't match anything,
-	// drop them before hitting the DB.
+	// Drop version-less packages like the grype CLI: they never match.
 	sbomCfg := syft.DefaultCreateSBOMConfig()
 	sbomCfg.Compliance.MissingVersion = cataloging.ComplianceActionDrop
 

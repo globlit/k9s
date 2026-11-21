@@ -154,9 +154,8 @@ func (m *MetricsServer) FetchNodesMetricsMap(ctx context.Context) (NodesMetricsM
 	return hh, nil
 }
 
-// Lookup maps are cached next to the metrics list they were built from and
-// rebuilt only when that list is re-fetched: views look metrics up on every
-// refresh, often for a single pod. Callers must treat them as read-only.
+// Cache lookup maps with their metrics list; rebuild on re-fetch.
+// Callers must not mutate them.
 type (
 	nodesMapEntry struct {
 		list *mv1beta1.NodeMetricsList

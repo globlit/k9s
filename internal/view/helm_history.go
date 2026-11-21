@@ -107,7 +107,7 @@ func (h *History) rollbackCmd(evt *tcell.EventKey) *tcell.EventKey {
 	msg := fmt.Sprintf("RollingBack chart [yellow::b]%s[-::-] to release <[orangered::b]%s[-::-]>?", n, rev)
 	dialog.ShowConfirmAck(h.App().App, h.App().Content.Pages, n, false, "Confirm Rollback", msg, func() {
 		h.App().Flash().Infof("Rolling back chart `%s...", n)
-		// A rollback can take up to the call timeout: keep the UI responsive.
+		// Roll back off the UI goroutine: it may take the full call timeout.
 		go func() {
 			defer internal.LogPanic("helm rollback")
 			ctx, cancel := context.WithTimeout(context.Background(), h.App().Conn().Config().CallTimeout())

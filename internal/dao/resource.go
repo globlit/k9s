@@ -94,7 +94,7 @@ func (r *Resource) ToYAML(path string, showManaged bool) (string, error) {
 }
 
 // getForYAML returns the cached object, or the live one when the cache
-// stripped what is asked for: managed fields, and CRD schemas.
+// stripped managed fields or CRD schemas.
 func (r *Resource) getForYAML(path string, showManaged bool) (runtime.Object, error) {
 	if showManaged || r.gvr == client.CrdGVR {
 		return r.Generic.Get(context.Background(), path)

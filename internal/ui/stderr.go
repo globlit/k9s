@@ -12,37 +12,31 @@ import (
 	"sync/atomic"
 )
 
-// Stray writes to the terminal while the TUI owns it corrupt the screen:
-// tcell only repaints cells it believes changed, so the garbage stays until
-// something redraws those rows. The main offender is client-go's exec
-// credential plugin (e.g. kubelogin/OIDC), which inherits os.Stderr and
-// prints a login URL whenever a token expires mid-session.
+// Stray stderr writes corrupt the TUI: tcell repaints changed cells only.
+// Exec credential plugins (kubelogin/OIDC) print login URLs on token expiry.
 //
-// client-go captures the os.Stderr *variable* when an authenticator is
-// created, so k9s swaps os.Stderr for a pipe before any client is built and
-// routes the output: straight to the terminal while the TUI is not drawing
-// (startup, suspended shells), and to the log + flash bar while it is.
-// Go runtime fatal errors still write to fd 2 directly and stay visible.
+// client-go reads the os.Stderr variable when building authenticators: swap
+// it for a pipe first. Route output to the terminal while the TUI is idle,
+// else to the log and flash bar. Runtime fatal errors still reach fd 2.
 
 var (
 	realStderr = os.Stderr
 
-	// stderrCaptured is true while the TUI owns the terminal.
+	// stderrCaptured tracks TUI terminal ownership.
 	stderrCaptured atomic.Bool
 
 	stderrHandlerMx sync.RWMutex
 	stderrHandler   func(line string)
 )
 
-// RealStderr returns the terminal's stderr, bypassing the capture pipe.
-// Use it for child processes that legitimately own the terminal.
+// RealStderr returns the terminal stderr, bypassing capture. Use it for
+// child processes owning the terminal.
 func RealStderr() *os.File {
 	return realStderr
 }
 
-// CaptureStderr routes writes to os.Stderr through k9s. It must be called
-// before any Kubernetes client is created. The returned func restores the
-// original os.Stderr.
+// CaptureStderr routes os.Stderr writes through k9s. Call it before
+// creating clients. Returns a restore func.
 func CaptureStderr() (restore func(), err error) {
 	r, w, err := os.Pipe()
 	if err != nil {
@@ -58,9 +52,8 @@ func CaptureStderr() (restore func(), err error) {
 	}, nil
 }
 
-// SetStderrCaptured toggles whether stderr output is kept off the terminal.
-// Set it while the TUI is drawing; clear it while the terminal is handed to
-// a child process (shell, editor, plugin).
+// SetStderrCaptured toggles keeping stderr off the terminal. Set it while
+// the TUI draws, clear it for child processes (shell, editor, plugin).
 func SetStderrCaptured(b bool) {
 	stderrCaptured.Store(b)
 }
@@ -90,8 +83,7 @@ func pumpStderr(r *os.File) {
 		if n > 0 {
 			chunk := buf[:n]
 			if !stderrCaptured.Load() {
-				// Pass through as-is (no line buffering) so interactive
-				// prompts without a trailing newline still show up.
+				// Pass through unbuffered: show prompts without newlines.
 				flushPending(&pending)
 				_, _ = realStderr.Write(chunk)
 			} else {
@@ -110,7 +102,7 @@ func drainLines(b *bytes.Buffer) {
 	for {
 		idx := bytes.IndexByte(b.Bytes(), '\n')
 		if idx < 0 {
-			// Guard against unbounded growth from output without newlines.
+			// Bound growth on output without newlines.
 			if b.Len() > 64*1024 {
 				handleCapturedLine(b.String())
 				b.Reset()
@@ -139,7 +131,7 @@ func handleCapturedLine(line string) {
 	notifyStderr(line)
 }
 
-// ExtractURL returns the first http(s) URL found in s, if any.
+// ExtractURL returns the first http(s) URL in s.
 func ExtractURL(s string) (string, bool) {
 	for _, p := range []string{"https://", "http://"} {
 		if i := strings.Index(s, p); i >= 0 {

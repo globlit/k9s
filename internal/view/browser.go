@@ -765,9 +765,8 @@ func (b *Browser) simpleDelete(selections []string, msg string) {
 	}, func() {})
 }
 
-// deleteAsync deletes the selected resources off the UI goroutine, then
-// updates marks and the table. A slow or unreachable API server must not
-// freeze k9s.
+// deleteAsync deletes selections off the UI goroutine, then updates marks
+// and the table.
 func (b *Browser) deleteAsync(selections []string, del func(context.Context, string) error) {
 	gvr := b.GVR()
 	runAsync(b.defaultContext(), b.app, selections, "delete",
@@ -792,10 +791,9 @@ func (b *Browser) deleteAsync(selections []string, del func(context.Context, str
 	)
 }
 
-// runAsync applies fn to each selection off the UI goroutine, each call
-// bounded by the API call timeout, then calls done on the UI goroutine with
-// what succeeded and what failed. When several items fail, it flashes a
-// summary naming the verb.
+// runAsync applies fn to each selection off the UI goroutine, bounded by
+// the call timeout, then calls done on the UI goroutine with results.
+// Flash a summary when several items fail.
 func runAsync(ctx context.Context, app *App, sels []string, verb string,
 	fn func(context.Context, string) error, done func(succeeded []string, errs []error)) {
 	timeout := app.Conn().Config().CallTimeout()

@@ -20,8 +20,8 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-// Flux key bindings. Shift-G is tview's "Goto Bottom", hence Shift-W for
-// reconciling with source.
+// Flux key bindings. Shift-G means "Goto Bottom": use Shift-W for reconcile
+// with source.
 const (
 	fluxKeyReconcile   = ui.KeyShiftR
 	fluxKeyWithSource  = ui.KeyShiftW
@@ -30,10 +30,9 @@ const (
 	fluxKeyJumpSource  = ui.KeyShiftZ
 )
 
-// FluxExtender adds native FluxCD actions (suspend/resume, reconcile,
-// reconcile with source, HelmRelease force/reset, jump to source) to Flux
-// resource views. It talks to the API server through k9s's own connection:
-// no flux CLI required.
+// FluxExtender adds native FluxCD actions to Flux views: suspend/resume,
+// reconcile, reconcile with source, force/reset, jump to source.
+// No flux CLI required.
 type FluxExtender struct {
 	ResourceViewer
 
@@ -90,8 +89,7 @@ func (f *FluxExtender) target(path string) dao.FluxTarget {
 	return dao.FluxTarget{GVR: f.GVR(), Namespace: ns, Name: n}
 }
 
-// get reads an object live: generic Flux views are not informer backed, and
-// right after a toggle a cache could be stale.
+// get reads an object live: caches go stale right after a toggle.
 func (f *FluxExtender) get(ctx context.Context, t dao.FluxTarget) (*unstructured.Unstructured, error) {
 	d, err := f.dial()
 	if err != nil {
@@ -110,9 +108,8 @@ func (f *FluxExtender) kind(n int) string {
 	return r
 }
 
-// reconcile requests a reconcile of each selected object, skipping
-// suspended ones like the flux CLI does. extra annotations get the same
-// timestamp as requestedAt.
+// reconcile requests a reconcile per selection, skipping suspended ones
+// like the flux CLI. Stamp extra annotations with requestedAt.
 func (f *FluxExtender) reconcile(sels []string, verb string, extra ...string) {
 	f.App().Flash().Infof("%s requested for %d %s...", verb, len(sels), f.kind(len(sels)))
 	f.run(sels, verb, func(ctx context.Context, d dynamic.Interface, path string) error {
@@ -156,8 +153,7 @@ func (f *FluxExtender) reconcileWithSourceCmd(*tcell.EventKey) *tcell.EventKey {
 		if err != nil {
 			return err
 		}
-		// Sources first. Unlike the CLI we don't wait for each source to be
-		// ready: controllers pick up the new artifact by themselves.
+		// Sources first. Don't wait for readiness: controllers pick up artifacts.
 		now := dao.FluxTimestamp(time.Now())
 		for _, c := range chain {
 			if err := dao.FluxPatch(ctx, d, c, dao.FluxReconcilePatch(now)); err != nil {
@@ -197,9 +193,8 @@ func (f *FluxExtender) helmUpgradeCmd(*tcell.EventKey) *tcell.EventKey {
 	return nil
 }
 
-// suspendCmd suspends or resumes the selection. The direction is decided
-// once from the current state: resume when all are suspended, otherwise
-// suspend all. Explicit values are patched, never inverted.
+// suspendCmd resumes when all selections are suspended, else suspends all.
+// Patch explicit values, never invert.
 func (f *FluxExtender) suspendCmd(*tcell.EventKey) *tcell.EventKey {
 	sels := f.selections()
 	if len(sels) == 0 {
@@ -275,8 +270,7 @@ func (f *FluxExtender) jumpSourceCmd(*tcell.EventKey) *tcell.EventKey {
 	return nil
 }
 
-// run applies fn to each selection off the UI goroutine, then reports and
-// refreshes the view.
+// run applies fn to selections off the UI goroutine, then reports and refreshes.
 func (f *FluxExtender) run(sels []string, verb string, fn func(context.Context, dynamic.Interface, string) error) {
 	d, err := f.dial()
 	if err != nil {

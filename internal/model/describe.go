@@ -33,16 +33,13 @@ type Describe struct {
 	listeners   []ResourceViewerListener
 	decode      bool
 
-	// kubectl describe is expensive (REST mapping, events LIST, and for nodes
-	// a LIST of all their pods): only re-run it when the object changed, or
-	// periodically to pick up new events.
+	// Describe is costly: re-run on object change, or periodically for events.
 	lastRV       string
 	lastDescribe time.Time
 	force        atomic.Bool
 }
 
-// describeMaxAge bounds how stale events in a describe can get when the
-// object itself does not change.
+// describeMaxAge bounds describe event staleness.
 const describeMaxAge = 30 * time.Second
 
 // NewDescribe returns a new describe resource model.
@@ -164,7 +161,7 @@ func (d *Describe) refresh(ctx context.Context) error {
 			slogs.GVR, d.gvr,
 			slogs.Error, err,
 		)
-		// Forget the last output so the next success redraws over the error.
+		// Reset output to redraw over the error.
 		d.lines, d.lastRV = nil, ""
 		d.fireResourceFailed(err)
 		return err
@@ -236,11 +233,9 @@ func (d *Describe) Toggle() {
 	d.force.Store(true)
 }
 
-// resourceVersion returns the cached resource version of the described
-// object, or "" when it is unknown (the describe then always runs).
+// resourceVersion returns the cached resource version, or "" if unknown.
 func (d *Describe) resourceVersion(ctx context.Context) string {
-	// Only real API resources are informer-backed; asking the factory about
-	// k9s pseudo-resources (helm, containers, ...) would start bogus watches.
+	// Skip pseudo-resources (helm, containers...): no informers back them.
 	if m, err := dao.MetaAccess.MetaFor(d.gvr); err != nil || dao.IsK9sMeta(m) || !d.gvr.IsK8sRes() {
 		return ""
 	}

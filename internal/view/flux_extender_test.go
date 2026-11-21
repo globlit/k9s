@@ -32,7 +32,7 @@ func fluxView(t *testing.T, gvr string, readOnly bool) *ui.KeyActions {
 	g := client.NewGVR(gvr)
 	dao.MetaAccess.RegisterMeta(gvr, &metav1.APIResource{
 		Name: g.R(), Group: g.G(), Version: g.V(), Namespaced: true, Kind: "Fred",
-		// k9s category: Browser.Init then skips the (absent) API server checks.
+		// k9s category: skip API server checks in Browser.Init.
 		Categories: []string{"k9s"},
 	})
 	cfg := mock.NewMockConfig(t)
@@ -99,8 +99,7 @@ func TestFluxExtenderBindings(t *testing.T) {
 	}
 }
 
-// Flux keys must not shadow existing table or browser actions (e.g. Shift-G
-// is "Goto Bottom" in tview tables).
+// Flux keys must not shadow table or browser actions.
 func TestFluxKeysDontOverlapBrowser(t *testing.T) {
 	g := "fred.example.io/v1/blees"
 	gvr := client.NewGVR(g)

@@ -112,7 +112,7 @@ func (s *Stack) Pop() (Component, bool) {
 	}
 	c := s.components[n-1]
 	c.Stop()
-	// Clear the slot so the popped view (and its table data) can be collected.
+	// Clear the slot to free the popped view.
 	s.components[n-1] = nil
 	s.components = s.components[:n-1]
 	s.mx.Unlock()

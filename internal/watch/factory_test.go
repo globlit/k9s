@@ -95,7 +95,7 @@ func TestFactoryEvictIdle(t *testing.T) {
 	assert.NotNil(t, f.FactoryFor("ns1"), "active namespace must be kept")
 	assert.Nil(t, f.FactoryFor("ns2"), "idle namespace must be stopped")
 
-	// A later access transparently restarts the informers.
+	// Restart informers on next access.
 	_, err = f.List(client.RsGVR, "ns2", false, labels.Everything())
 	require.NoError(t, err)
 	assert.NotNil(t, f.FactoryFor("ns2"))

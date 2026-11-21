@@ -84,8 +84,7 @@ type ClusterInfo struct {
 	listeners []ClusterInfoListener
 	cache     *cache.LRUExpireCache
 	mx        sync.RWMutex
-	// refreshMx serializes refreshes: startup and the periodic updater
-	// can overlap, and each one diffs against the previous snapshot.
+	// refreshMx serializes refreshes: startup and updater can overlap.
 	refreshMx sync.Mutex
 }
 
@@ -113,8 +112,7 @@ func (c *ClusterInfo) fetchK9sLatestRev() string {
 	if err != nil {
 		slog.Warn("k9s latest rev fetch failed", slogs.Error, err)
 	}
-	// Cache failures too: on air-gapped or proxied networks every cluster
-	// refresh would otherwise stall on this request again.
+	// Cache failures too: avoid stalls on air-gapped networks.
 	c.cache.Add(k9sLatestRevKey, latestRev, cacheExpiry)
 
 	return latestRev
@@ -126,7 +124,7 @@ func (c *ClusterInfo) Reset(f dao.Factory) {
 		return
 	}
 
-	// Not mid-refresh: Refresh reads c.cluster without c.mx.
+	// Wait for refreshes: Refresh reads c.cluster without c.mx.
 	c.refreshMx.Lock()
 	c.mx.Lock()
 	c.cluster, c.data = NewCluster(f), NewClusterMeta()

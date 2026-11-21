@@ -176,7 +176,7 @@ func TestFluxSourceChainHelmReleaseChartRef(t *testing.T) {
 		{GVR: hrGVR, Namespace: "apps", Name: "web"},
 	}, chain)
 
-	// chartRef to a HelmChart: follow the chart's own source.
+	// chartRef to a HelmChart: follow its source.
 	hr = obj("apps", "web", map[string]any{
 		"chartRef": map[string]any{"kind": "HelmChart", "name": "shared", "namespace": "charts"},
 	})

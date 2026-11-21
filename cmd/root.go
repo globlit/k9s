@@ -82,8 +82,7 @@ func Execute() {
 }
 
 func run(*cobra.Command, []string) (err error) {
-	// Must happen before any Kubernetes client is created: client-go's exec
-	// credential plugins capture os.Stderr when their authenticator is built.
+	// Capture before creating clients: exec credential plugins grab os.Stderr.
 	if restore, e := ui.CaptureStderr(); e == nil {
 		defer restore()
 	}
@@ -106,7 +105,7 @@ func run(*cobra.Command, []string) (err error) {
 			printLogo(color.Red)
 			fmt.Printf("%s", color.Colorize("Boom!! ", color.Red))
 			fmt.Printf("%v.\n", r)
-			// Report the crash through the exit code instead of exiting 0.
+			// Exit non-zero on crash.
 			err = fmt.Errorf("k9s crashed: %v", r)
 		}
 	}()

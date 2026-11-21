@@ -120,7 +120,7 @@ func run(a *App, opts *shellOpts) (ok bool, errC chan error, outC chan string) {
 	ran := false
 	ok = a.Suspend(func() {
 		ran = true
-		// The child owns the terminal now: let stderr through.
+		// Child owns the terminal: pass stderr through.
 		ui.SetStderrCaptured(false)
 		defer ui.SetStderrCaptured(true)
 		if err := execute(opts, statusChan); err != nil {
@@ -130,8 +130,7 @@ func run(a *App, opts *shellOpts) (ok bool, errC chan error, outC chan string) {
 		close(errChan)
 	})
 	if !ran {
-		// The command never ran: close the channels so callers ranging over
-		// them don't block the UI forever.
+		// Command never ran: close channels to unblock callers.
 		close(errChan)
 		close(statusChan)
 	}
@@ -202,8 +201,7 @@ func execute(opts *shellOpts, statusChan chan<- string) error {
 		clearScreen()
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	// Background commands outlive this call, so they release the context
-	// themselves once the command completes (see pipe).
+	// Background commands release the context on completion (see pipe).
 	defer func() {
 		if !opts.background {
 			cancel()
@@ -213,9 +211,8 @@ func execute(opts *shellOpts, statusChan chan<- string) error {
 
 	var interrupted atomic.Bool
 	if !opts.background {
-		// Only foreground commands own the terminal and should react to
-		// Ctrl-C. The handler is always unregistered so k9s regains its
-		// default signal handling once the command returns.
+		// Forward Ctrl-C to foreground commands only. Always unregister to
+		// restore default signal handling.
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 		defer signal.Stop(sigChan)
@@ -318,7 +315,7 @@ func oneShoot(ctx context.Context, opts *shellOpts) (string, error) {
 	buff := bytes.NewBufferString("")
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, buff, buff
 	if !opts.clear {
-		// The TUI still owns the terminal: don't let the child read keys.
+		// TUI owns the terminal: keep stdin from the child.
 		cmd.Stdin = nil
 	}
 	_, _ = cmd.Stdout.Write([]byte(opts.banner))
@@ -427,8 +424,7 @@ func nukeK9sShell(a *App) error {
 	}
 
 	ns := a.Config.K9s.ShellPod.Namespace
-	// The shell pod is privileged and mounts the node's root: give the delete
-	// a real chance to succeed on slow links instead of leaking it.
+	// Allow time on slow links: never leak a privileged node shell pod.
 	ctx, cancel := context.WithTimeout(context.Background(), nodeShellDeleteTimeout)
 	defer cancel()
 
@@ -462,7 +458,7 @@ func launchShellPod(ctx context.Context, a *App, node string) (err error) {
 	if _, err = conn.Create(ctx, spec, metav1.CreateOptions{}); err != nil {
 		return err
 	}
-	// Never leave a privileged pod behind when the shell can't start.
+	// Delete the privileged pod when the shell fails to start.
 	defer func() {
 		if err != nil {
 			if e := nukeK9sShell(a); e != nil {
@@ -507,8 +503,7 @@ func launchShellPod(ctx context.Context, a *App, node string) (err error) {
 	return fmt.Errorf("unable to launch shell pod on node %s", node)
 }
 
-// shellPodFailed reports pod states that will never become Running, so the
-// user gets the reason right away instead of after the full retry window.
+// shellPodFailed reports pod states that never reach Running, to fail fast.
 func shellPodFailed(pod *v1.Pod) (string, bool) {
 	switch pod.Status.Phase {
 	case v1.PodFailed, v1.PodSucceeded:
@@ -619,9 +614,8 @@ func asResource(r config.Limits) v1.ResourceRequirements {
 	}
 }
 
-// pipe runs cmds, chaining their stdout/stdin. statusChan is always closed
-// once the command(s) complete so callers ranging over it never block forever.
-// For background commands, done is called once the command terminates.
+// pipe runs cmds, chaining stdout to stdin. Always close statusChan on
+// completion. Call done when background commands terminate.
 func pipe(_ context.Context, done context.CancelFunc, opts *shellOpts, statusChan chan<- string, w, e *bytes.Buffer, cmds ...*exec.Cmd) error {
 	if len(cmds) == 0 {
 		close(statusChan)
@@ -631,7 +625,7 @@ func pipe(_ context.Context, done context.CancelFunc, opts *shellOpts, statusCha
 	if len(cmds) == 1 {
 		cmd := cmds[0]
 		if opts.background {
-			// Background commands must not read the terminal tview owns.
+			// Keep background commands off the tview terminal.
 			cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, w, e
 			go func() {
 				defer done()
@@ -686,8 +680,7 @@ func pipe(_ context.Context, done context.CancelFunc, opts *shellOpts, statusCha
 	for i := range cmds {
 		cmds[i].Stderr = ui.RealStderr()
 		if i < last {
-			// Use an OS pipe: it is closed when cmds[i] exits so the next
-			// command sees EOF (an io.Pipe writer would never be closed).
+			// Use an OS pipe: the next command gets EOF when cmds[i] exits.
 			out, err := cmds[i].StdoutPipe()
 			if err != nil {
 				return err
@@ -708,15 +701,14 @@ func pipe(_ context.Context, done context.CancelFunc, opts *shellOpts, statusCha
 		started = append(started, cmd)
 	}
 	if errs != nil {
-		// A downstream command never started; earlier ones could block on a
-		// full pipe forever, so stop them before reaping.
+		// Downstream start failed: kill earlier commands blocked on full pipes.
 		for _, cmd := range started {
 			if cmd.Process != nil {
 				_ = cmd.Process.Kill()
 			}
 		}
 	}
-	// Reap every started command so none are left as zombies.
+	// Reap started commands: no zombies.
 	for i := len(started) - 1; i >= 0; i-- {
 		if err := started[i].Wait(); err != nil {
 			var ex *exec.ExitError
@@ -730,8 +722,7 @@ func pipe(_ context.Context, done context.CancelFunc, opts *shellOpts, statusCha
 	return errs
 }
 
-// failureReason returns the most useful line describing a failed command:
-// the last line it wrote to stderr, or the exec error itself.
+// failureReason returns the last stderr line, or the exec error.
 func failureReason(err error, stderr *bytes.Buffer) string {
 	ll := strings.Split(strings.TrimSpace(stderr.String()), "\n")
 	if l := strings.TrimSpace(ll[len(ll)-1]); l != "" {
@@ -741,8 +732,8 @@ func failureReason(err error, stderr *bytes.Buffer) string {
 	return err.Error()
 }
 
-// impersonateGroupArgs passes each impersonated group as its own flag:
-// kubectl reads --as-group as a list, so "a,b" would be one bogus group.
+// impersonateGroupArgs passes one --as-group flag per group: kubectl reads
+// "a,b" as a single group.
 func impersonateGroupArgs(a *App) []string {
 	gg := a.Conn().Config().Flags().ImpersonateGroup
 	if gg == nil {

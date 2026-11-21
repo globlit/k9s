@@ -52,8 +52,7 @@ func TestShowPrompt(t *testing.T) {
 		queue(func() {
 			d := p.GetPrimitive(dialogKey).(*tview.ModalForm)
 			if assert.NotNil(t, d) {
-				// Hand out focus like tview.Application does so key events
-				// reach the form's Cancel button.
+				// Set focus like tview.Application to reach the Cancel button.
 				var setFocus func(tview.Primitive)
 				setFocus = func(p tview.Primitive) { p.Focus(setFocus) }
 				d.Focus(setFocus)
