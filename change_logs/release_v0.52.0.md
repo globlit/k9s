@@ -4,23 +4,18 @@
 
 ## Notes
 
-First release of **K9s Reloaded**, a maintained fork of [derailed/k9s](https://github.com/derailed/k9s) focused on stability and speed for daily use on busy clusters.
+K9s Reloaded is a fork of [derailed/k9s](https://github.com/derailed/k9s), built on its own [tview](https://github.com/globlit/tview) and [tcell](https://github.com/globlit/tcell) forks.
 
-This release targets crashes, frozen UIs on chatty log streams, slow connects on constrained networks, and screen corruption from OIDC login prompts.
-K9s Reloaded now builds on its own forks of [tview](https://github.com/globlit/tview) and [tcell](https://github.com/globlit/tcell).
-
-Please grab the latest rev and report anything odd!
+Please grab the latest rev and report any issues!
 
 ---
 
-## Logs: Fast Again!
+## Log View
 
-Log views no longer stall on busy multi-pod deployments.
-
-* Lines stream continuously, even when a stream never pauses. No more lines dropped between flushes.
-* UI updates are coalesced and paced on draw cost, so the view stays responsive at tens of thousands of lines per second.
-* The log view re-indexes appended lines only. A frame on a 5k-line buffer drops from ~470ms to ~3.5ms.
-* Invalid filter regexes fall back to a literal match instead of crashing k9s.
+* Stream lines continuously, without drops between flushes.
+* Coalesce UI updates on chatty multi-pod streams.
+* Re-index appended lines only.
+* Fall back to a literal match on invalid filter regexes.
 
 ---
 
