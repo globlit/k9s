@@ -101,6 +101,13 @@ func TestRestartErrors(t *testing.T) {
 			conn: func(c client.Connection) client.Connection { return &mutConn{Connection: c, dialErr: errMut} },
 			err:  "boom",
 		},
+		"cani-patch": {
+			path: "ns1/a",
+			conn: func(c client.Connection) client.Connection {
+				return &mutConn{Connection: c, canIErr: errMut, canIVerb: "patch"}
+			},
+			err: "boom",
+		},
 	}
 
 	for fk, fam := range restartFamilies {
@@ -122,6 +129,17 @@ func TestRestartErrors(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestRestartPausedDeployment(t *testing.T) {
+	dp := mutWorkloads()[0].(*appsv1.Deployment)
+	dp.Spec.Paused = true
+	fc := fakecluster.New(t, fakecluster.WithObjects(dp))
+	var d Deployment
+	d.Init(mutFactory(t, fc.Conn()), client.DpGVR)
+
+	require.ErrorContains(t, d.Restart(context.Background(), "ns1/a", &metav1.PatchOptions{}), "paused")
+	assert.Empty(t, fc.Actions("patch", "*"))
 }
 
 // Pin: restartRes skips resources it does not know and reports no error.

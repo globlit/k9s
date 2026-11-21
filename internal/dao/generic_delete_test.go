@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync/atomic"
 	"testing"
 
@@ -25,14 +26,16 @@ import (
 var errMut = errors.New("boom")
 
 // mutConn wraps a connection and fails the calls that have an error set.
+// When canIVerb is set, CanI fails only for that verb.
 type mutConn struct {
 	client.Connection
 
 	canIErr, dialErr, dynErr error
+	canIVerb                 string
 }
 
 func (c *mutConn) CanI(ns string, gvr *client.GVR, n string, verbs []string) (bool, error) {
-	if c.canIErr != nil {
+	if c.canIErr != nil && (c.canIVerb == "" || slices.Contains(verbs, c.canIVerb)) {
 		return false, c.canIErr
 	}
 	return c.Connection.CanI(ns, gvr, n, verbs)

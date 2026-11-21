@@ -264,6 +264,19 @@ func TestNodeDrainRefused(t *testing.T) {
 	}
 }
 
+type failWriter struct{}
+
+func (failWriter) Write([]byte) (int, error) { return 0, errMut }
+
+func TestNodeDrainOutputError(t *testing.T) {
+	fc := drainCluster(t, false, false)
+
+	err := newNode(t, fc.Conn()).Drain("n1", DrainOptions{GracePeriodSeconds: -1}, failWriter{})
+
+	require.ErrorIs(t, err, errMut)
+	assert.Empty(t, evictions(fc))
+}
+
 func TestNodeDrainErrors(t *testing.T) {
 	all := DrainOptions{GracePeriodSeconds: -1, Force: true, IgnoreAllDaemonSets: true, DeleteEmptyDirData: true}
 	forbidden := apierrors.NewForbidden(schema.GroupResource{Resource: "pods/eviction"}, "managed", errMut)
