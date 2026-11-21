@@ -69,12 +69,17 @@ func (s *Scaler) Scale(ctx context.Context, path string, replicas int32) error {
 }
 
 func (s *Scaler) scaleClient() (scale.ScalesGetter, error) {
-	cfg, err := s.Client().RestConfig()
+	return newScalesGetter(s.Client())
+}
+
+// newScalesGetter builds the scale client. Tests replace it.
+var newScalesGetter = func(c client.Connection) (scale.ScalesGetter, error) {
+	cfg, err := c.RestConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	discoveryClient, err := s.Client().CachedDiscovery()
+	discoveryClient, err := c.CachedDiscovery()
 	if err != nil {
 		return nil, err
 	}
