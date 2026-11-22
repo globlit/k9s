@@ -58,7 +58,10 @@ func (h *HelmHistory) List(ctx context.Context, _ string) ([]runtime.Object, err
 }
 
 // Get returns a resource.
-func (h *HelmHistory) Get(_ context.Context, path string) (runtime.Object, error) {
+func (h *HelmHistory) Get(ctx context.Context, path string) (runtime.Object, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	fqn, rev, found := strings.Cut(path, ":")
 	if !found || rev == "" {
 		return nil, fmt.Errorf("invalid path %q", path)
@@ -81,6 +84,9 @@ func (h *HelmHistory) Get(_ context.Context, path string) (runtime.Object, error
 		return nil, err
 	}
 
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	return helm.ReleaseRes{Release: resp}, nil
 }
 

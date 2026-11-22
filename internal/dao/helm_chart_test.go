@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/globlit/k9s/internal"
 	"github.com/globlit/k9s/internal/client"
@@ -247,4 +248,23 @@ func TestHelmConfigCacheConcurrent(t *testing.T) {
 	}
 	wg.Wait()
 	assert.LessOrEqual(t, helmCacheLen(), maxHelmCfgCache)
+}
+
+func TestHelmReadTimeout(t *testing.T) {
+	resetHelmCache(t)
+	flags := testFlags(t, "ct-timeout")
+	flags.Timeout = nil
+	first, err := ensureHelmConfig(flags, "ns1")
+	require.NoError(t, err)
+	rest, err := first.RESTClientGetter.ToRESTConfig()
+	require.NoError(t, err)
+	assert.Equal(t, client.DefaultCallTimeoutDuration, rest.Timeout)
+	timeout := "7s"
+	flags.Timeout = &timeout
+	second, err := ensureHelmConfig(flags, "ns1")
+	require.NoError(t, err)
+	assert.NotSame(t, first, second, "timeout must participate in the Helm cache key")
+	rest, err = second.RESTClientGetter.ToRESTConfig()
+	require.NoError(t, err)
+	assert.Equal(t, 7*time.Second, rest.Timeout)
 }

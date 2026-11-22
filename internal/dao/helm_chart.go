@@ -160,7 +160,7 @@ var helmConfigFor = ensureHelmConfig
 func ensureHelmConfig(flags *genericclioptions.ConfigFlags, ns string) (*action.Configuration, error) {
 	key := strings.Join([]string{
 		deref(flags.Context), deref(flags.KubeConfig), deref(flags.APIServer),
-		deref(flags.Impersonate), deref(flags.BearerToken), ns, os.Getenv("HELM_DRIVER"),
+		deref(flags.Impersonate), deref(flags.BearerToken), deref(flags.Timeout), ns, os.Getenv("HELM_DRIVER"),
 	}, "|")
 
 	helmCfgMx.Lock()
@@ -188,8 +188,15 @@ func deref(s *string) string {
 }
 
 func newHelmConfig(flags *genericclioptions.ConfigFlags, ns string) (*action.Configuration, error) {
+	// Helm's read actions do not accept a context. Bound each API request with
+	// the same timeout as other k9s reads, including when --request-timeout is unset.
+	timeout := deref(flags.Timeout)
+	if timeout == "" || timeout == "0" || timeout == "0s" {
+		timeout = client.DefaultCallTimeoutDuration.String()
+	}
 	settings := &genericclioptions.ConfigFlags{
 		Namespace:        &ns,
+		Timeout:          &timeout,
 		Context:          flags.Context,
 		BearerToken:      flags.BearerToken,
 		APIServer:        flags.APIServer,
