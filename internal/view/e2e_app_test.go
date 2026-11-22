@@ -127,7 +127,6 @@ func TestE2EAliasesHelpHeader(t *testing.T) {
 }
 
 func TestE2ECrumbsToggle(t *testing.T) {
-	t.Skip("bug: App.layout does not set showCrumbs, so the first ctrl-g does nothing")
 	s := NewSimApp(t, e2eCluster(t))
 	s.e2eWait("<pod>")
 
