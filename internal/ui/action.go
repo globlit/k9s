@@ -108,13 +108,25 @@ func (a *KeyActions) Reset(aa *KeyActions) {
 
 // Range ranges over all actions and triggers a given function.
 func (a *KeyActions) Range(f RangeFn) {
-	var km KeyMap
+	type entry struct {
+		key    tcell.Key
+		action KeyAction
+	}
+	// Keep ordinary action sets on the stack. Larger plugin sets use one
+	// allocation; neither path holds the lock while callbacks mutate actions.
+	var local [64]entry
+	snapshot := local[:0]
 	a.mx.RLock()
-	km = a.actions
+	if len(a.actions) > len(local) {
+		snapshot = make([]entry, 0, len(a.actions))
+	}
+	for key, action := range a.actions {
+		snapshot = append(snapshot, entry{key, action})
+	}
 	a.mx.RUnlock()
 
-	for k, v := range km {
-		f(k, v)
+	for _, item := range snapshot {
+		f(item.key, item.action)
 	}
 }
 

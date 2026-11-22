@@ -130,7 +130,7 @@ func boundActions(t *testing.T, s *SimApp) []boundAction {
 	t.Helper()
 	v := topViewer(t, s)
 	var out []boundAction
-	// Use Get, not Range: Range reads the map without the lock.
+	// Inspect the bounded key space to keep action snapshots stable for fixtures.
 	aa := v.Actions()
 	for k := tcell.Key(0); k < 1024; k++ {
 		if a, ok := aa.Get(k); ok {
@@ -265,7 +265,6 @@ func TestReadOnlyBindings(t *testing.T) {
 }
 
 func TestKeyActionsRangeRace(t *testing.T) {
-	t.Skip("bug: KeyActions.Range iterates the map after it drops the lock; a concurrent Delete races")
 	aa := ui.NewKeyActions()
 	for k := range tcell.Key(64) {
 		aa.Add(k, ui.NewKeyAction("x", nil, false))
