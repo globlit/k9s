@@ -29,7 +29,16 @@ var propagationOptions []string = []string{
 
 // ShowDelete pops a resource deletion dialog.
 func ShowDelete(styles *config.Dialog, pages *ui.Pages, msg string, ok okFunc, cancel cancelFunc) {
-	propagation, force := "", false
+	showDeleteDialog(styles, pages, msg, false, false, func(p *metav1.DeletionPropagation, force, _ bool) { ok(p, force) }, cancel)
+}
+
+// ShowDeleteWithFinalizers adds an opt-in recovery action for terminating resources.
+func ShowDeleteWithFinalizers(styles *config.Dialog, pages *ui.Pages, msg string, allTerminating bool, ok func(*metav1.DeletionPropagation, bool, bool), cancel cancelFunc) {
+	showDeleteDialog(styles, pages, msg, true, allTerminating, ok, cancel)
+}
+
+func showDeleteDialog(styles *config.Dialog, pages *ui.Pages, msg string, allowFinalizers, allTerminating bool, ok func(*metav1.DeletionPropagation, bool, bool), cancel cancelFunc) {
+	propagation, force, removeFinalizers := "", false, false
 	f := tview.NewForm()
 	f.SetItemPadding(0)
 	f.SetButtonsAlign(tview.AlignCenter).
@@ -45,9 +54,22 @@ func ShowDelete(styles *config.Dialog, pages *ui.Pages, msg string, ok okFunc, c
 		styles.FgColor.Color(), styles.BgColor.Color(),
 		styles.ButtonFocusFgColor.Color(), styles.ButtonFocusBgColor.Color(),
 	)
+	syncFinalizers := func() {
+		index := f.GetFormItemIndex("Remove finalizers:")
+		visible := allowFinalizers && (allTerminating || force)
+		if visible && index < 0 {
+			f.AddCheckbox("Remove finalizers:", false, func(_ string, checked bool) { removeFinalizers = checked })
+		}
+		if !visible && index >= 0 {
+			f.RemoveFormItem(index)
+			removeFinalizers = false
+		}
+	}
 	f.AddCheckbox("Force:", force, func(_ string, checked bool) {
 		force = checked
+		syncFinalizers()
 	})
+	syncFinalizers()
 	f.AddButton("Cancel", func() {
 		dismiss(pages)
 		cancel()
@@ -55,10 +77,10 @@ func ShowDelete(styles *config.Dialog, pages *ui.Pages, msg string, ok okFunc, c
 	f.AddButton("OK", func() {
 		switch propagation {
 		case noDeletePropagation:
-			ok(nil, force)
+			ok(nil, force, removeFinalizers)
 		default:
 			p := metav1.DeletionPropagation(propagation)
-			ok(&p, force)
+			ok(&p, force, removeFinalizers)
 		}
 		dismiss(pages)
 		cancel()
@@ -71,7 +93,7 @@ func ShowDelete(styles *config.Dialog, pages *ui.Pages, msg string, ok okFunc, c
 		b.SetBackgroundColorActivated(styles.ButtonFocusBgColor.Color())
 		b.SetLabelColorActivated(styles.ButtonFocusFgColor.Color())
 	}
-	f.SetFocus(2)
+	f.SetFocus(f.GetFormItemCount())
 
 	confirm := tview.NewModalForm("<Delete>", f)
 	confirm.SetText(msg)

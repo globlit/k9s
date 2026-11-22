@@ -128,7 +128,7 @@ func TestBrowserDeleteDialog(t *testing.T) {
 		t.Run(fmt.Sprintf("dismiss-%d", k), func(t *testing.T) {
 			selectPath(t, s, "ns1/dp-a")
 			s.Keys(tcell.KeyCtrlD)
-			require.True(t, s.DialogOpen())
+			s.Eventually(s.DialogOpen, "no delete dialog")
 			assert.Contains(t, s.Screen(), "Delete deployments ns1/dp-a?")
 
 			s.Keys(k)
@@ -170,6 +170,7 @@ func TestBrowserDeleteDialog(t *testing.T) {
 	t.Run("marked", func(t *testing.T) {
 		markPaths(t, s, "ns1/dp-a", "ns1/dp-b", "ns1/dp-c")
 		s.Keys(tcell.KeyCtrlD)
+		s.Eventually(s.DialogOpen, "no delete dialog")
 		assert.Contains(t, s.Screen(), "Delete 3 marked apps/v1/deployments?")
 		assert.NotContains(t, s.Screen(), "hidden by filter")
 		s.ConfirmDelete("Foreground", false)
@@ -192,6 +193,7 @@ func TestBrowserDeleteDialog(t *testing.T) {
 		s.Eventually(func() bool { return !rowShown(s, "dp-c") }, "filter not applied")
 
 		s.Keys(tcell.KeyCtrlD)
+		s.Eventually(s.DialogOpen, "no delete dialog")
 		assert.Contains(t, s.Screen(), "Delete 3 marked apps/v1/deployments? (2 currently")
 		assert.Contains(t, s.Screen(), "hidden by filter)")
 		s.Keys(tcell.KeyEscape)

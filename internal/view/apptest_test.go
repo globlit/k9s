@@ -368,9 +368,9 @@ func (s *SimApp) focus() tview.Primitive {
 // prop is Background, Foreground, Orphan or None.
 func (s *SimApp) ConfirmDelete(prop string, force bool) {
 	s.t.Helper()
-	require.True(s.t, s.DialogOpen(), "no delete dialog")
+	s.Eventually(s.DialogOpen, "no delete dialog")
 
-	s.Keys(tcell.KeyBacktab, tcell.KeyBacktab)
+	focusItem(s.t, s, "Propagation:")
 	dd, ok := s.focus().(*tview.DropDown)
 	require.True(s.t, ok, "propagation field not focused")
 	var found bool
@@ -386,14 +386,14 @@ func (s *SimApp) ConfirmDelete(prop string, force bool) {
 	})
 	require.True(s.t, found, "no propagation option %q", prop)
 
-	s.Keys(tcell.KeyTab)
+	focusItem(s.t, s, "Force:")
 	cb, ok := s.focus().(*tview.Checkbox)
 	require.True(s.t, ok, "force field not focused")
 	if force != cb.IsChecked() {
 		s.Keys(' ')
 	}
 
-	s.Keys(tcell.KeyTab, tcell.KeyTab)
+	focusItem(s.t, s, "OK")
 	b, ok := s.focus().(*tview.Button)
 	require.True(s.t, ok && b.GetLabel() == "OK", "OK button not focused")
 	s.Keys(tcell.KeyEnter)

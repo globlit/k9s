@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -845,7 +846,53 @@ func runAsync(ctx context.Context, app *App, sels []string, verb string,
 }
 
 func (b *Browser) resourceDelete(selections []string, msg string) {
-	okFn := func(propagation *metav1.DeletionPropagation, force bool) {
+	if b.app.Config.IsReadOnly() {
+		return
+	}
+	if !client.Can(b.meta.Verbs, "edit") {
+		b.showResourceDelete(selections, msg, nil, false, nil)
+		return
+	}
+	top := b.app.Content.Top()
+	activeContext := b.app.Config.K9s.ActiveContextName()
+	var resource dao.Generic
+	resource.Init(b.app.factory, b.GVR())
+	if err := resource.PinClient(); err != nil {
+		b.showResourceDelete(selections, msg, nil, false, nil)
+		return
+	}
+	uids := make(map[string]types.UID, len(selections))
+	allTerminating := true
+	runAsync(b.defaultContext(), b.app, selections, "Read delete selection", func(ctx context.Context, path string) error {
+		obj, err := resource.Get(ctx, path)
+		if err != nil {
+			return err
+		}
+		u, ok := obj.(*unstructured.Unstructured)
+		if !ok || u.GetUID() == "" {
+			return fmt.Errorf("resource %s has no UID", path)
+		}
+		uids[path] = u.GetUID()
+		allTerminating = allTerminating && u.GetDeletionTimestamp() != nil
+		return nil
+	}, func(_ []string, errs []error) {
+		if b.app.Config.IsReadOnly() || b.app.Content.Top() != top || b.app.Config.K9s.ActiveContextName() != activeContext {
+			return
+		}
+		if len(errs) > 0 {
+			uids = nil
+			allTerminating = false
+		}
+		b.showResourceDelete(selections, msg, uids, allTerminating, &resource)
+	})
+}
+
+func (b *Browser) showResourceDelete(selections []string, msg string, uids map[string]types.UID, allTerminating bool, resource *dao.Generic) {
+	activeContext := b.app.Config.K9s.ActiveContextName()
+	okFn := func(propagation *metav1.DeletionPropagation, force, removeFinalizers bool) {
+		if b.app.Config.IsReadOnly() || b.app.Config.K9s.ActiveContextName() != activeContext {
+			return
+		}
 		b.ShowDeleted()
 		if len(selections) > 1 {
 			b.app.Flash().Infof("Delete %d marked %s", len(selections), b.GVR())
@@ -858,9 +905,19 @@ func (b *Browser) resourceDelete(selections []string, msg string) {
 		}
 		m := b.GetModel()
 		b.deleteAsync(selections, func(ctx context.Context, sel string) error {
+			if b.app.Config.K9s.ActiveContextName() != activeContext {
+				return fmt.Errorf("active context changed")
+			}
+			if removeFinalizers {
+				return resource.DeleteWithFinalizers(ctx, sel, uids[sel], propagation, grace, force)
+			}
 			return m.Delete(ctx, sel, propagation, grace)
 		})
 	}
 	d := b.app.Styles.Dialog()
-	dialog.ShowDelete(&d, b.app.Content.Pages, msg, okFn, func() {})
+	if len(uids) == len(selections) && len(uids) > 0 {
+		dialog.ShowDeleteWithFinalizers(&d, b.app.Content.Pages, msg, allTerminating, okFn, func() {})
+	} else {
+		dialog.ShowDelete(&d, b.app.Content.Pages, msg, func(p *metav1.DeletionPropagation, force bool) { okFn(p, force, false) }, func() {})
+	}
 }

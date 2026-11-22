@@ -1,3 +1,5 @@
+# Native delete offers opt-in metadata finalizer removal for terminating resources (or Force).
+# Namespace spec.finalizers are not handled by either this metadata patch or native delete.
 # Removes all finalizers from the selected resource. Finalizers are namespaced keys that tell Kubernetes to wait
 # until specific conditions are met before it fully deletes resources marked for deletion.
 # Before deleting an object you need to ensure that all finalizers has been removed. Usually this would be done

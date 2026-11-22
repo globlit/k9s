@@ -46,7 +46,7 @@ func nodePatchBodies(fc *fakecluster.Cluster) []string {
 }
 
 // focusItem presses Tab until the focus is on the form item or button with label.
-func focusItem(t *testing.T, s *SimApp, label string) {
+func focusItem(t testing.TB, s *SimApp, label string) {
 	t.Helper()
 	for range 20 {
 		switch p := s.focus().(type) {

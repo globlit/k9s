@@ -142,3 +142,47 @@ func TestDeleteDialogForce(t *testing.T) {
 func ptr[T any](v T) *T {
 	return &v
 }
+
+func TestDeleteFinalizersRequireOptIn(t *testing.T) {
+	for _, terminating := range []bool{true, false} {
+		t.Run(map[bool]string{true: "terminating", false: "active"}[terminating], func(t *testing.T) {
+			pages := ui.NewPages()
+			var called, removed bool
+			ShowDeleteWithFinalizers(new(config.Dialog), pages, "Delete?", terminating, func(_ *metav1.DeletionPropagation, _ bool, remove bool) { called, removed = true, remove }, func() {})
+			d := openDialog(t, pages, dialogKey)
+			d.tabTo(t, "OK")
+			d.press(tcell.KeyEnter)
+			assert.True(t, called)
+			assert.False(t, removed)
+		})
+	}
+}
+
+func TestDeleteFinalizersHideAndReset(t *testing.T) {
+	pages := ui.NewPages()
+	var removed bool
+	ShowDeleteWithFinalizers(new(config.Dialog), pages, "Delete?", false, func(_ *metav1.DeletionPropagation, _ bool, remove bool) { removed = remove }, func() {})
+	d := openDialog(t, pages, dialogKey)
+	d.tabToItem(t, "Force:")
+	d.rune(' ')
+	d.tabToItem(t, "Remove finalizers:")
+	d.rune(' ')
+	d.tabToItem(t, "Force:")
+	d.rune(' ')
+	d.tabTo(t, "OK")
+	d.press(tcell.KeyEnter)
+	assert.False(t, removed)
+}
+
+func TestDeleteFinalizersTerminating(t *testing.T) {
+	pages := ui.NewPages()
+	var force, removed bool
+	ShowDeleteWithFinalizers(new(config.Dialog), pages, "Delete?", true, func(_ *metav1.DeletionPropagation, f, remove bool) { force, removed = f, remove }, func() {})
+	d := openDialog(t, pages, dialogKey)
+	d.tabToItem(t, "Remove finalizers:")
+	d.rune(' ')
+	d.tabTo(t, "OK")
+	d.press(tcell.KeyEnter)
+	assert.True(t, removed)
+	assert.False(t, force)
+}
