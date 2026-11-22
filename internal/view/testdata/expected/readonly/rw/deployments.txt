@@ -13,10 +13,12 @@ Ctrl-\       Marks Clear
 Enter        View
 Esc          Filter Reset
 Shift-A      Sort Age
+Shift-E      Events
 Shift-F      Port-Forward
 Shift-J      Jump Owner
 Shift-N      Sort Name
 Shift-O      Sort Selected Column
+Shift-P      Pause/Resume [dangerous]
 Shift-S      Sort Status
 c            Copy
 d            Describe

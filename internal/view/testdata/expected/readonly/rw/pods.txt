@@ -14,6 +14,8 @@ Ctrl-\       Marks Clear
 Enter        View
 Esc          Filter Reset
 Shift-A      Sort Age
+Shift-D      Debug [dangerous]
+Shift-E      Events
 Shift-F      Port-Forward
 Shift-J      Jump Owner
 Shift-N      Sort Name
