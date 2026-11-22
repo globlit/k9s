@@ -208,6 +208,14 @@ func TestE2EBenchmarksWithoutDir(t *testing.T) {
 	assert.DirExists(t, benchDir(s.App().Config))
 }
 
+func TestE2ECustomResourceDefinition(t *testing.T) {
+	fc := e2eCluster(t, fakecluster.WithCRD(client.NewGVR("fred.com/v1/blees"), "Blee", true))
+	s := NewSimApp(t, fc)
+	s.e2eWait("web-7d9-aaaaa")
+
+	s.e2eGoto(":crd", "CustomResourceDefinition", "customresourcedefinitions(all)[1]", "fred.com", "Blee", "Namespaced")
+}
+
 func TestE2ENamespaceSwitch(t *testing.T) {
 	s := NewSimApp(t, e2eCluster(t))
 	s.e2eWait("web-7d9-aaaaa", "db-0")
