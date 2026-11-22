@@ -27,11 +27,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          build-cache: e2e
 
       - name: Install tmux
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tmux
@@ -42,9 +41,7 @@ jobs:
           version: v3.22.1
 
       - name: Build before starting the cluster
-        run: |
-          mkdir -p /tmp/k9s-e2e
-          GOMAXPROCS=4 CGO_ENABLED=0 go build -p 2 -o /tmp/k9s-e2e/k9s main.go
+        run: make e2e-build
 
       - name: Create kind cluster
         uses: helm/kind-action@ea822c7bf1874f08e5a491df991c228edffc3376 # v1.15.2
@@ -58,7 +55,7 @@ jobs:
         run: make e2e-kind-up
 
       - name: Run e2e tests
-        run: make e2e
+        run: make e2e-run
 
       - name: Upload E2E evidence
         if: always()

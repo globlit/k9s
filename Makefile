@@ -53,7 +53,7 @@ bench-compare:           ## Compare BENCH_BASE with BENCH_OUT using benchstat
 	@$(BENCHSTAT) -format csv $(BENCH_BASE) $(BENCH_OUT) > benchstat.csv
 	@python3 hack/benchcheck.py benchstat.csv
 
-.PHONY: e2e e2e-kind-up e2e-kind-down
+.PHONY: e2e e2e-build e2e-run e2e-kind-up e2e-kind-down
 
 e2e-kind-up:             ## Create the capped kind cluster k9s-e2e
 	@mkdir -p $(E2E_DIR)
@@ -68,8 +68,15 @@ e2e-kind-down:           ## Delete the kind cluster k9s-e2e only
 	@kind delete cluster --name $(E2E_CLUSTER) --kubeconfig $(E2E_DIR)/kubeconfig
 
 e2e:                     ## Build k9s into E2E_DIR and run the kind e2e tests
+	@$(MAKE) e2e-build
+	@$(MAKE) e2e-run
+
+e2e-build:               ## Build k9s for the kind e2e tests
 	@mkdir -p $(E2E_DIR)
 	@CGO_ENABLED=0 $(TEST_ENV) go build -p $(TEST_P) -o $(E2E_DIR)/k9s main.go
+
+e2e-run:                 ## Run the kind e2e tests with the built binary
+	@test -x $(E2E_DIR)/k9s
 	@K9S_E2E_BIN=$(E2E_DIR)/k9s $(TEST_ENV) go test -count=1 -tags e2e -p 1 -timeout 30m \
 		$(if $(E2E_RUN),-run '$(E2E_RUN)') ./e2e/...
 
