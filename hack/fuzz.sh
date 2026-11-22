@@ -6,7 +6,10 @@ FUZZTIME="${FUZZTIME:-60s}"
 PARALLEL="${FUZZ_PARALLEL:-2}"
 
 status=0
-packages=$(go list ./...)
+if [ "$#" -eq 0 ]; then
+	set -- ./...
+fi
+packages=$(go list "$@")
 found=0
 for pkg in $packages; do
 	listing=$(go test -list '^Fuzz' "$pkg")
@@ -21,7 +24,7 @@ for pkg in $packages; do
 done
 
 if [ "$found" -eq 0 ]; then
- echo "No fuzz targets discovered" >&2
- exit 1
+	echo "No fuzz targets discovered" >&2
+	exit 1
 fi
 exit "$status"

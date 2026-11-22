@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Discover fuzz functions in every Go test file, not just *_fuzz_test.go.
+# Group fuzz targets by package so each job reuses its build cache.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 python3 - <<'PY'
 import json
 import pathlib
 import re
-out = []
+packages = set()
 for root in ('internal', 'cmd'):
     for path in sorted(pathlib.Path(root).rglob('*_test.go')):
-        for target in re.findall(r'^func (Fuzz\w+)\(f \*testing\.F\)', path.read_text(), re.M):
-            out.append({'pkg': './' + str(path.parent), 'target': target})
-if not out:
+        if re.search(r'^func Fuzz\w+\(f \*testing\.F\)', path.read_text(), re.M):
+            packages.add(str(path.parent))
+if not packages:
     raise SystemExit('No fuzz targets discovered')
-print(json.dumps(out))
+print(json.dumps([{'pkg': './' + p, 'id': p.replace('/', '-')} for p in sorted(packages)]))
 PY
