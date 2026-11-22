@@ -10,6 +10,7 @@ import (
 	"github.com/globlit/k9s/internal"
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/config/mock"
+	"github.com/globlit/k9s/internal/ui"
 	"github.com/globlit/k9s/internal/view"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,7 +21,10 @@ func TestPodNew(t *testing.T) {
 
 	require.NoError(t, po.Init(makeCtx(t)))
 	assert.Equal(t, "Pods", po.Name())
-	assert.Len(t, po.Hints(), 19)
+	assert.Len(t, po.Hints(), 20)
+	action, ok := po.Actions().Get(ui.KeyShiftD)
+	require.True(t, ok)
+	assert.Equal(t, "Debug", action.Description)
 }
 
 // Helpers...

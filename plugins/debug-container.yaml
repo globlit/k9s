@@ -1,3 +1,4 @@
+# Native Shift-D opens the debug-container form. Set another shortcut to use this plugin.
 plugins:
   #--- Create debug container for selected pod in current namespace
   # See https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/#ephemeral-container

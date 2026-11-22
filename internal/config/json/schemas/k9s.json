@@ -47,6 +47,14 @@
             "invert": {"type": "boolean"}
           }
         },
+        "debugContainer": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "image": {"type": "string", "minLength": 1},
+            "profile": {"type": "string", "minLength": 1}
+          }
+        },
         "shellPod": {
           "type": "object",
           "additionalProperties": true,

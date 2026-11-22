@@ -63,6 +63,7 @@ func (*Container) Name() string { return containerTitle }
 
 func (c *Container) bindDangerousKeys(aa *ui.KeyActions) {
 	aa.Bulk(ui.KeyMap{
+		ui.KeyShiftD: ui.NewKeyActionWithOpts("Debug", c.debugCmd, ui.ActionOpts{Visible: true, Dangerous: true}),
 		ui.KeyS: ui.NewKeyActionWithOpts(
 			"Shell",
 			c.shellCmd,

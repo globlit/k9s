@@ -88,6 +88,7 @@ func (p *Pod) portForwardIndicator(data *model1.TableData) {
 
 func (p *Pod) bindDangerousKeys(aa *ui.KeyActions) {
 	aa.Bulk(ui.KeyMap{
+		ui.KeyShiftD: ui.NewKeyActionWithOpts("Debug", p.debugCmd, ui.ActionOpts{Visible: true, Dangerous: true}),
 		tcell.KeyCtrlK: ui.NewKeyActionWithOpts(
 			"Kill",
 			p.killCmd,
@@ -365,8 +366,12 @@ func (p *Pod) transferCmd(*tcell.EventKey) *tcell.EventKey {
 // Helpers...
 
 func containerShellIn(a *App, comp model.Component, path, co string) error {
+	return pickContainer(a, path, co, func(co string) { resumeShellIn(a, comp, path, co) })
+}
+
+func pickContainer(a *App, path, co string, selected func(string)) error {
 	if co != "" {
-		resumeShellIn(a, comp, path, co)
+		selected(co)
 		return nil
 	}
 
@@ -375,20 +380,23 @@ func containerShellIn(a *App, comp model.Component, path, co string) error {
 		return err
 	}
 	if dco, ok := dao.GetDefaultContainer(&pod.ObjectMeta, &pod.Spec); ok {
-		resumeShellIn(a, comp, path, dco)
+		selected(dco)
 		return nil
 	}
 
 	cc := fetchContainers(&pod.ObjectMeta, &pod.Spec, false)
+	if len(cc) == 0 {
+		return fmt.Errorf("pod %s has no containers", path)
+	}
 	if len(cc) == 1 {
-		resumeShellIn(a, comp, path, cc[0])
+		selected(cc[0])
 		return nil
 	}
 
 	picker := NewPicker()
 	picker.populate(cc)
 	picker.SetSelectedFunc(func(_ int, co, _ string, _ rune) {
-		resumeShellIn(a, comp, path, co)
+		selected(co)
 	})
 
 	return a.inject(picker, false)

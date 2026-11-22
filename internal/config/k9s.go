@@ -64,23 +64,24 @@ var defaultGPUVendors = gpuVendors{
 
 // K9s tracks K9s configuration options.
 type K9s struct {
-	LiveViewAutoRefresh bool       `json:"liveViewAutoRefresh" yaml:"liveViewAutoRefresh"`
-	GPUVendors          gpuVendors `json:"gpuVendors" yaml:"gpuVendors"`
-	ScreenDumpDir       string     `json:"screenDumpDir" yaml:"screenDumpDir,omitempty"`
-	RefreshRate         float32    `json:"refreshRate" yaml:"refreshRate"`
-	APIServerTimeout    string     `json:"apiServerTimeout" yaml:"apiServerTimeout"`
-	MaxConnRetry        int32      `json:"maxConnRetry" yaml:"maxConnRetry"`
-	ReadOnly            bool       `json:"readOnly" yaml:"readOnly"`
-	NoExitOnCtrlC       bool       `json:"noExitOnCtrlC" yaml:"noExitOnCtrlC"`
-	PortForwardAddress  string     `json:"portForwardAddress" yaml:"portForwardAddress"`
-	UI                  UI         `json:"ui" yaml:"ui"`
-	SkipLatestRevCheck  bool       `json:"skipLatestRevCheck" yaml:"skipLatestRevCheck"`
-	DisablePodCounting  bool       `json:"disablePodCounting" yaml:"disablePodCounting"`
-	ShellPod            *ShellPod  `json:"shellPod" yaml:"shellPod"`
-	ImageScans          ImageScans `json:"imageScans" yaml:"imageScans"`
-	Logger              Logger     `json:"logger" yaml:"logger"`
-	Thresholds          Threshold  `json:"thresholds" yaml:"thresholds"`
-	DefaultView         string     `json:"defaultView" yaml:"defaultView"`
+	LiveViewAutoRefresh bool           `json:"liveViewAutoRefresh" yaml:"liveViewAutoRefresh"`
+	GPUVendors          gpuVendors     `json:"gpuVendors" yaml:"gpuVendors"`
+	ScreenDumpDir       string         `json:"screenDumpDir" yaml:"screenDumpDir,omitempty"`
+	RefreshRate         float32        `json:"refreshRate" yaml:"refreshRate"`
+	APIServerTimeout    string         `json:"apiServerTimeout" yaml:"apiServerTimeout"`
+	MaxConnRetry        int32          `json:"maxConnRetry" yaml:"maxConnRetry"`
+	ReadOnly            bool           `json:"readOnly" yaml:"readOnly"`
+	NoExitOnCtrlC       bool           `json:"noExitOnCtrlC" yaml:"noExitOnCtrlC"`
+	PortForwardAddress  string         `json:"portForwardAddress" yaml:"portForwardAddress"`
+	UI                  UI             `json:"ui" yaml:"ui"`
+	SkipLatestRevCheck  bool           `json:"skipLatestRevCheck" yaml:"skipLatestRevCheck"`
+	DisablePodCounting  bool           `json:"disablePodCounting" yaml:"disablePodCounting"`
+	ShellPod            *ShellPod      `json:"shellPod" yaml:"shellPod"`
+	ImageScans          ImageScans     `json:"imageScans" yaml:"imageScans"`
+	DebugContainer      DebugContainer `json:"debugContainer" yaml:"debugContainer"`
+	Logger              Logger         `json:"logger" yaml:"logger"`
+	Thresholds          Threshold      `json:"thresholds" yaml:"thresholds"`
+	DefaultView         string         `json:"defaultView" yaml:"defaultView"`
 	manualRefreshRate   float32
 	manualReadOnly      *bool
 	manualCommand       *string
@@ -107,6 +108,7 @@ func NewK9s(conn client.Connection, ks data.KubeSettings) *K9s {
 		Thresholds:         NewThreshold(),
 		PortForwardAddress: defaultPFAddress(),
 		ShellPod:           NewShellPod(),
+		DebugContainer:     NewDebugContainer(),
 		ImageScans:         NewImageScans(),
 		dir:                data.NewDir(AppContextsDir),
 		conn:               conn,
@@ -180,6 +182,7 @@ func (k *K9s) Merge(k1 *K9s) {
 	if k1.ShellPod != nil {
 		k.ShellPod = k1.ShellPod
 	}
+	k.DebugContainer = k1.DebugContainer.Validate()
 	k.Logger = k1.Logger
 	k.ImageScans = k1.ImageScans
 	if k1.Thresholds != nil {
@@ -509,6 +512,9 @@ func (k *K9s) Validate(c client.Connection, contextName, clusterName string) {
 		k.ShellPod.Validate()
 	}
 	// Write only on change: views read these settings concurrently.
+	if d := k.DebugContainer.Validate(); d != k.DebugContainer {
+		k.DebugContainer = d
+	}
 	if l := k.Logger.Validate(); l != k.Logger {
 		k.Logger = l
 	}
