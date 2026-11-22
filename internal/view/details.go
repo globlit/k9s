@@ -128,7 +128,6 @@ func (*Details) BufferChanged(_, _ string) {}
 
 // BufferCompleted indicates input was accepted.
 func (d *Details) BufferCompleted(text, _ string) {
-	// Runs on the command buffer debounce goroutine.
 	d.model.Filter(text)
 	d.app.QueueUpdateDraw(d.updateTitle)
 }

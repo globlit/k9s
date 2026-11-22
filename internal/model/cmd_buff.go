@@ -48,6 +48,7 @@ type CmdBuff struct {
 	kind       BufferKind
 	active     bool
 	cancel     context.CancelFunc
+	queue      func(func())
 	mx         sync.RWMutex
 }
 
@@ -114,23 +115,41 @@ func (c *CmdBuff) GetSuggestion() string {
 	return c.suggestion
 }
 
-func (c *CmdBuff) hasCancel() bool {
-	c.mx.RLock()
-	defer c.mx.RUnlock()
-
-	return c.cancel != nil
-}
-
-func (c *CmdBuff) setCancel(f context.CancelFunc) {
+// SetQueue runs the debounced apply through q, for example the UI event loop.
+func (c *CmdBuff) SetQueue(q func(func())) {
 	c.mx.Lock()
-	c.cancel = f
+	c.queue = q
 	c.mx.Unlock()
 }
 
-func (c *CmdBuff) resetCancel() {
+func (c *CmdBuff) debounce(delay time.Duration) {
+	c.mx.Lock()
+	defer c.mx.Unlock()
+	if c.cancel != nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), delay)
+	c.cancel = cancel
+	queue := c.queue
+
+	go func() {
+		defer internal.LogPanic("cmd buffer")
+		<-ctx.Done()
+		if queue == nil {
+			c.applyPending()
+			return
+		}
+		queue(func() { c.applyPending() })
+	}()
+}
+
+func (c *CmdBuff) applyPending() {
 	c.mx.Lock()
 	c.cancel = nil
+	text, suggestion := string(c.buff), c.suggestion
 	c.mx.Unlock()
+
+	c.fireBufferCompleted(text, suggestion)
 }
 
 // SetText initializes the buffer with a command.
@@ -151,18 +170,7 @@ func (c *CmdBuff) Add(r rune) {
 	c.buff = append(c.buff, r)
 	c.mx.Unlock()
 	c.fireBufferChanged(c.GetText(), c.GetSuggestion())
-	if c.hasCancel() {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), keyEntryDelay)
-	c.setCancel(cancel)
-
-	go func() {
-		defer internal.LogPanic("cmd buffer")
-		<-ctx.Done()
-		c.fireBufferCompleted(c.GetText(), c.GetSuggestion())
-		c.resetCancel()
-	}()
+	c.debounce(keyEntryDelay)
 }
 
 // Delete removes the last character from the buffer.
@@ -176,19 +184,7 @@ func (c *CmdBuff) Delete() {
 	c.mx.RUnlock()
 	c.SetText(text, "", true)
 	c.fireBufferChanged(c.GetText(), c.GetSuggestion())
-	if c.hasCancel() {
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
-	c.setCancel(cancel)
-
-	go func() {
-		defer internal.LogPanic("cmd buffer")
-		<-ctx.Done()
-		c.fireBufferCompleted(c.GetText(), c.GetSuggestion())
-		c.resetCancel()
-	}()
+	c.debounce(800 * time.Millisecond)
 }
 
 // ClearText clears out command buffer.
