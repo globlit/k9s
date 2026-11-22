@@ -23,6 +23,7 @@ var defaultSTSHeader = model1.Header{
 	model1.HeaderColumn{Name: "SERVICE"},
 	model1.HeaderColumn{Name: colContainers, Attrs: model1.Attrs{Wide: true}},
 	model1.HeaderColumn{Name: colImages, Attrs: model1.Attrs{Wide: true}},
+	model1.HeaderColumn{Name: colRollout},
 	model1.HeaderColumn{Name: colLabels, Attrs: model1.Attrs{Wide: true}},
 	model1.HeaderColumn{Name: colValid, Attrs: model1.Attrs{Wide: true}},
 	model1.HeaderColumn{Name: colAge, Attrs: model1.Attrs{Time: true}},
@@ -63,10 +64,7 @@ func (s StatefulSet) defaultRow(raw *unstructured.Unstructured, r *model1.Row) e
 		return err
 	}
 
-	var desired int32
-	if sts.Spec.Replicas != nil {
-		desired = *sts.Spec.Replicas
-	}
+	desired := desiredReplicas(sts.Spec.Replicas)
 	r.ID = client.MetaFQN(&sts.ObjectMeta)
 	r.Fields = model1.Fields{
 		sts.Namespace,
@@ -77,8 +75,9 @@ func (s StatefulSet) defaultRow(raw *unstructured.Unstructured, r *model1.Row) e
 		na(sts.Spec.ServiceName),
 		podContainerNames(&sts.Spec.Template.Spec, true),
 		podImageNames(&sts.Spec.Template.Spec, true),
+		statefulSetRollout(&sts),
 		mapToStr(sts.Labels),
-		AsStatus(s.diagnose(desired, sts.Status.Replicas, sts.Status.ReadyReplicas)),
+		AsStatus(s.diagnose(&sts)),
 		ToAge(sts.GetCreationTimestamp()),
 	}
 	stashAge(r, sts.GetCreationTimestamp())
@@ -86,7 +85,11 @@ func (s StatefulSet) defaultRow(raw *unstructured.Unstructured, r *model1.Row) e
 	return nil
 }
 
-func (StatefulSet) diagnose(d, c, r int32) error {
+func (StatefulSet) diagnose(sts *appsv1.StatefulSet) error {
+	if err := rolloutError(statefulSetRollout(sts)); err != nil {
+		return err
+	}
+	d, c, r := desiredReplicas(sts.Spec.Replicas), sts.Status.Replicas, sts.Status.ReadyReplicas
 	if c != r {
 		return fmt.Errorf("desired %d replicas got %d available", c, r)
 	}

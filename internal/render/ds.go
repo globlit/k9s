@@ -24,6 +24,7 @@ var defaultDSHeader = model1.Header{
 	model1.HeaderColumn{Name: colReady, Attrs: model1.Attrs{Align: tview.AlignRight}},
 	model1.HeaderColumn{Name: "UP-TO-DATE", Attrs: model1.Attrs{Align: tview.AlignRight}},
 	model1.HeaderColumn{Name: "AVAILABLE", Attrs: model1.Attrs{Align: tview.AlignRight}},
+	model1.HeaderColumn{Name: colRollout},
 	model1.HeaderColumn{Name: colLabels, Attrs: model1.Attrs{Wide: true}},
 	model1.HeaderColumn{Name: colValid, Attrs: model1.Attrs{Wide: true}},
 	model1.HeaderColumn{Name: colAge, Attrs: model1.Attrs{Time: true}},
@@ -75,8 +76,9 @@ func (d DaemonSet) defaultRow(raw *unstructured.Unstructured, r *model1.Row) err
 		strconv.Itoa(int(ds.Status.NumberReady)),
 		strconv.Itoa(int(ds.Status.UpdatedNumberScheduled)),
 		strconv.Itoa(int(ds.Status.NumberAvailable)),
+		daemonSetRollout(&ds),
 		mapToStr(ds.Labels),
-		AsStatus(d.diagnose(ds.Status.DesiredNumberScheduled, ds.Status.NumberReady)),
+		AsStatus(d.diagnose(&ds)),
 		ToAge(ds.GetCreationTimestamp()),
 	}
 	stashAge(r, ds.GetCreationTimestamp())
@@ -85,7 +87,11 @@ func (d DaemonSet) defaultRow(raw *unstructured.Unstructured, r *model1.Row) err
 }
 
 // Happy returns true if resource is happy, false otherwise.
-func (DaemonSet) diagnose(d, r int32) error {
+func (DaemonSet) diagnose(ds *appsv1.DaemonSet) error {
+	if err := rolloutError(daemonSetRollout(ds)); err != nil {
+		return err
+	}
+	d, r := ds.Status.DesiredNumberScheduled, ds.Status.NumberReady
 	if d != r {
 		return fmt.Errorf("desiring %d replicas but %d ready", d, r)
 	}

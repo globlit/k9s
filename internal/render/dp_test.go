@@ -58,7 +58,7 @@ func TestDpRenderFlagsMissingReplicas(t *testing.T) {
 			c := render.Deployment{}
 			r := model1.NewRow(9)
 			require.NoError(t, c.Render(o, "", &r))
-			assert.Equal(t, u.valid, r.Fields[7])
+			assert.Equal(t, u.valid, r.Fields[8])
 		})
 	}
 }
