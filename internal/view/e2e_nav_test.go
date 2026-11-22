@@ -202,7 +202,6 @@ func TestE2EEveryViewer(t *testing.T) {
 }
 
 func TestE2EBenchmarksWithoutDir(t *testing.T) {
-	t.Skip("bug: the benchmarks view does not create its dir, so a new user sees a watcher error")
 	s := NewSimApp(t, e2eCluster(t))
 	s.e2eGoto(":bench", "Benchmarks")
 

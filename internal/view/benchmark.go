@@ -40,7 +40,16 @@ func NewBenchmark(gvr *client.GVR) ResourceViewer {
 }
 
 func (b *Benchmark) benchContext(ctx context.Context) context.Context {
-	return context.WithValue(ctx, internal.KeyDir, benchDir(b.App().Config))
+	dir := benchDir(b.App().Config)
+	if dir == render.MissingValue {
+		return context.WithValue(ctx, internal.KeyDir, dir)
+	}
+	if err := data.EnsureFullPath(dir, 0o700); err != nil {
+		b.App().Flash().Err(err)
+		return ctx
+	}
+
+	return context.WithValue(ctx, internal.KeyDir, dir)
 }
 
 func (b *Benchmark) viewBench(app *App, _ ui.Tabular, _ *client.GVR, path string) {
