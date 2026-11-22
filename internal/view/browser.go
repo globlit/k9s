@@ -298,6 +298,15 @@ func (b *Browser) Aliases() sets.Set[string] {
 // ----------------------------------------------------------------------------
 // Model Protocol...
 
+// hasSynced skips local views such as benchmarks: they have no informer.
+func (b *Browser) hasSynced() (bool, error) {
+	if !dao.IsK8sMeta(b.meta) {
+		return true, nil
+	}
+
+	return b.app.factory.HasSynced(b.GVR(), b.GetNamespace())
+}
+
 // TableNoData notifies view no data is available.
 func (b *Browser) TableNoData(mdata *model1.TableData) {
 	var cancel context.CancelFunc
@@ -316,7 +325,7 @@ func (b *Browser) TableNoData(mdata *model1.TableData) {
 
 	// While the informer cache hasn't synced yet, show a neutral status
 	// instead of a misleading "no resources found" warning.
-	if synced, err := b.app.factory.HasSynced(b.GVR(), b.GetNamespace()); !synced {
+	if synced, err := b.hasSynced(); !synced {
 		b.app.QueueUpdateDraw(func() {
 			if err != nil {
 				b.app.Flash().Warnf("Unable to sync %s: %s", b.GVR(), err)
