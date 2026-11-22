@@ -44,6 +44,9 @@ func NewDeploy(gvr *client.GVR) ResourceViewer {
 }
 
 func (d *Deploy) bindKeys(aa *ui.KeyActions) {
+	if !d.App().Config.IsReadOnly() {
+		aa.Add(ui.KeyShiftP, ui.NewKeyActionWithOpts("Pause/Resume", d.togglePauseCmd, ui.ActionOpts{Visible: true, Dangerous: true}))
+	}
 	aa.Bulk(ui.KeyMap{
 		ui.KeyZ: ui.NewKeyAction("ReplicaSets", d.replicaSetsCmd, true),
 	})
@@ -114,4 +117,19 @@ func showReplicasetsFromSelector(app *App, path string, sel *metav1.LabelSelecto
 	}
 
 	showReplicasets(app, path, l, "")
+}
+
+func (d *Deploy) togglePauseCmd(evt *tcell.EventKey) *tcell.EventKey {
+	selections := d.GetTable().GetSelectedItems()
+	if len(selections) == 0 {
+		return evt
+	}
+	var resource dao.Deployment
+	resource.Init(d.App().factory, d.GVR())
+	if err := resource.PinClient(); err != nil {
+		d.App().Flash().Err(err)
+		return nil
+	}
+	confirmWorkloadState(d, selections, "paused", "Pause", "Resume", &resource.Generic, resource.SetPaused)
+	return nil
 }

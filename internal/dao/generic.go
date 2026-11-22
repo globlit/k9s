@@ -34,6 +34,7 @@ var _ Describer = (*Generic)(nil)
 // Generic represents a generic resource.
 type Generic struct {
 	NonResource
+	pinnedClient dynamic.NamespaceableResourceInterface
 }
 
 // List returns a collection of resources.
@@ -139,7 +140,22 @@ func (g *Generic) Delete(ctx context.Context, path string, propagation *metav1.D
 	return dial.Namespace(ns).Delete(ctx, n, opts)
 }
 
+// PinClient keeps an action on its original cluster if the user switches context.
+// Call only on a fresh action DAO before starting asynchronous work. Do not
+// reinitialize a pinned DAO for another GVR.
+func (g *Generic) PinClient() error {
+	client, err := g.dynClient()
+	if err != nil {
+		return err
+	}
+	g.pinnedClient = client
+	return nil
+}
+
 func (g *Generic) dynClient() (dynamic.NamespaceableResourceInterface, error) {
+	if g.pinnedClient != nil {
+		return g.pinnedClient, nil
+	}
 	dial, err := g.Client().DynDial()
 	if err != nil {
 		return nil, err

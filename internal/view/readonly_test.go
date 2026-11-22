@@ -28,6 +28,7 @@ import (
 
 // mutationWords name actions that change the cluster or local state.
 var mutationWords = []string{
+	"debug", "pause", "resume",
 	"delete", "kill", "edit", "scale", "restart", "set image", "drain", "cordon",
 	"rollback", "roll back", "trigger", "suspend", "apply", "shell", "attach", "transfer",
 	"sanitize", "uninstall", "reconcile", "force/reset",

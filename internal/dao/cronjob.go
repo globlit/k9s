@@ -140,37 +140,6 @@ func (c *CronJob) GetInstance(fqn string) (*batchv1.CronJob, error) {
 	return &cj, nil
 }
 
-// ToggleSuspend toggles suspend/resume on a CronJob.
-func (c *CronJob) ToggleSuspend(ctx context.Context, path string) error {
-	ns, n := client.Namespaced(path)
-	auth, err := c.Client().CanI(ns, c.gvr, n, []string{client.GetVerb, client.UpdateVerb})
-	if err != nil {
-		return err
-	}
-	if !auth {
-		return fmt.Errorf("user is not authorized to (un)suspend cronjobs")
-	}
-
-	dial, err := c.Client().Dial()
-	if err != nil {
-		return err
-	}
-	cj, err := dial.BatchV1().CronJobs(ns).Get(ctx, n, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	if cj.Spec.Suspend != nil {
-		current := !*cj.Spec.Suspend
-		cj.Spec.Suspend = &current
-	} else {
-		trueVal := true
-		cj.Spec.Suspend = &trueVal
-	}
-	_, err = dial.BatchV1().CronJobs(ns).Update(ctx, cj, metav1.UpdateOptions{})
-
-	return err
-}
-
 // Scan scans for cluster resource refs.
 func (c *CronJob) Scan(_ context.Context, gvr *client.GVR, fqn string, wait bool) (Refs, error) {
 	ns, n := client.Namespaced(fqn)

@@ -4,7 +4,6 @@
 package dao
 
 import (
-	"context"
 	"regexp"
 	"strings"
 	"testing"
@@ -113,66 +112,6 @@ func TestCronJobRunErrors(t *testing.T) {
 			if k != "create" {
 				assert.Empty(t, fc.Actions("create", "jobs"))
 			}
-		})
-	}
-}
-
-func TestCronJobToggleSuspend(t *testing.T) {
-	uu := map[string]struct {
-		suspend *bool
-		e       bool
-	}{
-		"unset":     {e: true},
-		"suspended": {suspend: new(true), e: false},
-		"active":    {suspend: new(false), e: true},
-	}
-
-	for k, u := range uu {
-		t.Run(k, func(t *testing.T) {
-			fc := fakecluster.New(t, fakecluster.WithObjects(mutCronJob("cj1", u.suspend)))
-
-			require.NoError(t, newCronJob(t, fc.Conn()).ToggleSuspend(context.Background(), "ns1/cj1"))
-
-			uu := fc.Actions("update", "cronjobs")
-			require.Len(t, uu, 1)
-			cj := uu[0].(k8stesting.UpdateAction).GetObject().(*batchv1.CronJob)
-			require.NotNil(t, cj.Spec.Suspend)
-			assert.Equal(t, u.e, *cj.Spec.Suspend)
-		})
-	}
-}
-
-func TestCronJobToggleSuspendErrors(t *testing.T) {
-	uu := map[string]struct {
-		path string
-		fc   []fakecluster.Option
-		conn func(client.Connection) client.Connection
-		err  string
-	}{
-		"deny":    {path: "ns1/cj1", fc: []fakecluster.Option{fakecluster.DenyVerb("update")}, err: "not authorized to (un)suspend"},
-		"missing": {path: "ns1/nope", err: "not found"},
-		"update":  {path: "ns1/cj1", fc: []fakecluster.Option{fakecluster.FailOn("update", "cronjobs", 0, errMut)}, err: "boom"},
-		"cani": {
-			path: "ns1/cj1",
-			conn: func(c client.Connection) client.Connection { return &mutConn{Connection: c, canIErr: errMut} },
-			err:  "boom",
-		},
-		"dial": {
-			path: "ns1/cj1",
-			conn: func(c client.Connection) client.Connection { return &mutConn{Connection: c, dialErr: errMut} },
-			err:  "boom",
-		},
-	}
-
-	for k, u := range uu {
-		t.Run(k, func(t *testing.T) {
-			fc := fakecluster.New(t, append([]fakecluster.Option{fakecluster.WithObjects(mutCronJob("cj1", nil))}, u.fc...)...)
-			var conn client.Connection = fc.Conn()
-			if u.conn != nil {
-				conn = u.conn(conn)
-			}
-
-			require.ErrorContains(t, newCronJob(t, conn).ToggleSuspend(context.Background(), u.path), u.err)
 		})
 	}
 }

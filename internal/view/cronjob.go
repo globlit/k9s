@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/globlit/k9s/internal"
 	"github.com/globlit/k9s/internal/client"
@@ -16,7 +15,6 @@ import (
 	"github.com/globlit/k9s/internal/ui"
 	"github.com/globlit/k9s/internal/ui/dialog"
 	"github.com/globlit/tcell/v2"
-	"github.com/globlit/tview"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -24,9 +22,8 @@ import (
 )
 
 const (
-	suspendDialogKey     = "suspend"
-	lastScheduledCol     = "LAST_SCHEDULE"
-	defaultSuspendStatus = "true"
+	suspendDialogKey = "suspend"
+	lastScheduledCol = "LAST_SCHEDULE"
 )
 
 // CronJob represents a cronjob viewer.
@@ -84,7 +81,7 @@ func (c *CronJob) bindKeys(aa *ui.KeyActions) {
 	}
 	aa.Bulk(ui.KeyMap{
 		ui.KeyT: ui.NewKeyAction("Trigger", c.triggerCmd, true),
-		ui.KeyS: ui.NewKeyAction("Suspend/Resume", c.toggleSuspendCmd, true),
+		ui.KeyS: ui.NewKeyActionWithOpts("Suspend/Resume", c.toggleSuspendCmd, ui.ActionOpts{Visible: true, Dangerous: true}),
 	})
 }
 
@@ -123,55 +120,24 @@ func (c *CronJob) triggerCmd(evt *tcell.EventKey) *tcell.EventKey {
 }
 
 func (c *CronJob) toggleSuspendCmd(evt *tcell.EventKey) *tcell.EventKey {
-	table := c.GetTable()
-	sel := table.GetSelectedItem()
-
-	if sel == "" {
+	selections := c.GetTable().GetSelectedItems()
+	if len(selections) == 0 {
 		return evt
 	}
-
-	cell := table.GetCell(c.GetTable().GetSelectedRowIndex(), c.GetTable().NameColIndex()+2)
-
-	if cell == nil {
-		c.App().Flash().Errf("Unable to assert current status")
+	res, err := dao.AccessorFor(c.App().factory, c.GVR())
+	if err != nil {
+		c.App().Flash().Err(err)
 		return nil
 	}
-
-	c.Stop()
-	defer c.Start()
-
-	c.showSuspendDialog(cell, sel)
-
-	return nil
-}
-
-func (c *CronJob) showSuspendDialog(cell *tview.TableCell, sel string) {
-	title := "Suspend"
-
-	if strings.TrimSpace(cell.Text) == defaultSuspendStatus {
-		title = "Resume"
+	resource, ok := res.(*dao.CronJob)
+	if !ok {
+		c.App().Flash().Errf("expecting a cron job for %q", c.GVR())
+		return nil
 	}
-
-	d := c.App().Styles.Dialog()
-	dialog.ShowConfirm(&d, c.App().Content.Pages, title, sel, func() {
-		ctx, cancel := context.WithTimeout(context.Background(), c.App().Conn().Config().CallTimeout())
-		defer cancel()
-
-		res, err := dao.AccessorFor(c.App().factory, c.GVR())
-		if err != nil {
-			c.App().Flash().Err(fmt.Errorf("no accessor for %q", c.GVR()))
-			return
-		}
-
-		cronJob, ok := res.(*dao.CronJob)
-		if !ok {
-			c.App().Flash().Errf("expecting a cron job for %q", c.GVR())
-			return
-		}
-
-		if err := cronJob.ToggleSuspend(ctx, sel); err != nil {
-			c.App().Flash().Errf("Cronjob %s failed for %v", strings.ToLower(title), err)
-			return
-		}
-	}, func() {})
+	if err := resource.PinClient(); err != nil {
+		c.App().Flash().Err(err)
+		return nil
+	}
+	confirmWorkloadState(c, selections, "suspend", "Suspend", "Resume", &resource.Generic, resource.SetSuspend)
+	return nil
 }

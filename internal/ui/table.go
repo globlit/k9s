@@ -440,13 +440,13 @@ func (t *Table) GetNamespace() string {
 }
 
 func (t *Table) doUpdate(data *model1.TableData) *model1.TableData {
-	if client.IsAllNamespaces(data.GetNamespace()) {
-		t.actions.Add(
-			KeyShiftP,
-			NewKeyAction("Sort Namespace", t.SortColCmd("NAMESPACE", true), false),
-		)
-	} else {
-		t.actions.Delete(KeyShiftP)
+	// A resource action (or an explicit plugin override) owns this key when bound.
+	if action, exists := t.actions.Get(KeyShiftP); !exists || (action.Description == "Sort Namespace" && !action.Opts.Plugin && !action.Opts.HotKey) {
+		if client.IsAllNamespaces(data.GetNamespace()) {
+			t.actions.Add(KeyShiftP, NewKeyAction("Sort Namespace", t.SortColCmd("NAMESPACE", true), false))
+		} else {
+			t.actions.Delete(KeyShiftP)
+		}
 	}
 
 	oldSortCol := t.getSortCol()

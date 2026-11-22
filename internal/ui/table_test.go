@@ -134,3 +134,16 @@ func makeContext() context.Context {
 
 	return ctx
 }
+
+func TestTableKeepsResourceNamespaceKey(t *testing.T) {
+	for _, ns := range []string{client.NamespaceAll, "ns1"} {
+		v := ui.NewTable(client.DpGVR)
+		v.Init(makeContext())
+		v.Actions().Add(ui.KeyShiftP, ui.NewKeyAction("Pause/Resume", nil, true))
+		data := model1.NewTableDataFull(client.DpGVR, ns, makeTableData().Header(), model1.NewRowEvents(0))
+		v.Update(data, false)
+		action, exists := v.Actions().Get(ui.KeyShiftP)
+		assert.True(t, exists)
+		assert.Equal(t, "Pause/Resume", action.Description)
+	}
+}

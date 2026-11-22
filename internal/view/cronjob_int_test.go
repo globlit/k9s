@@ -45,3 +45,22 @@ func TestCronJobBindKeysReadOnly(t *testing.T) {
 		})
 	}
 }
+
+func TestDeployPauseBinding(t *testing.T) {
+	for _, readOnly := range []bool{true, false} {
+		cfg := mock.NewMockConfig(t)
+		cfg.K9s.ReadOnly = readOnly
+		v := &cronJobViewerStub{app: NewApp(cfg)}
+		d := Deploy{ResourceViewer: v}
+		aa := ui.NewKeyActions()
+		aa.Add(ui.KeyShiftP, ui.NewKeyAction("Sort Namespace", nil, false))
+		d.bindKeys(aa)
+		action, _ := aa.Get(ui.KeyShiftP)
+		expected := "Pause/Resume"
+		if readOnly {
+			expected = "Sort Namespace"
+		}
+		assert.Equal(t, expected, action.Description)
+		assert.Equal(t, !readOnly, action.Opts.Dangerous)
+	}
+}

@@ -180,7 +180,6 @@ func TestMutationsWrongAccessor(t *testing.T) {
 	t.Run("suspend", func(t *testing.T) {
 		c := &CronJob{ResourceViewer: cm}
 		s.OnLoop(func() { c.toggleSuspendCmd(nil) })
-		confirmOK(t, s)
 		s.Eventually(flashHas(s, "expecting a cron job"), "no suspend flash")
 	})
 	assert.Empty(t, mutations(fc))
@@ -273,7 +272,7 @@ func TestCronJobAPIErrors(t *testing.T) {
 	fc := fakecluster.New(t,
 		fakecluster.WithObjects(simCronJob("cj-a"), simCronJob("cj-b")),
 		fakecluster.FailOn("create", "jobs", 1, errInvalid),
-		fakecluster.FailOn("update", "cronjobs", 0, errInvalid),
+		fakecluster.FailOn("patch", "cronjobs", 0, errInvalid),
 	)
 	s := NewSimApp(t, fc, SimNamespace("ns1"), SimView("cj"))
 
@@ -290,9 +289,10 @@ func TestCronJobAPIErrors(t *testing.T) {
 		selectPath(t, s, "ns1/cj-a")
 		fc.Reset()
 		s.Keys(ui.KeyS)
+		s.Eventually(s.DialogOpen, "no suspend dialog")
 		confirmOK(t, s)
-		s.Eventually(flashHas(s, "Cronjob suspend failed for boom"), "no suspend flash")
-		assert.Len(t, fc.Actions("update", "cronjobs"), 1)
+		s.Eventually(flashHas(s, "boom"), "no suspend flash")
+		assert.Len(t, fc.Actions("patch", "cronjobs"), 1)
 	})
 	t.Run("trigger-single", func(t *testing.T) {
 		selectPath(t, s, "ns1/cj-a")
@@ -504,17 +504,18 @@ func TestSetImageDialogDismiss(t *testing.T) {
 func TestCronJobResumeAPIError(t *testing.T) {
 	cj := simCronJob("cj-a")
 	cj.Spec.Suspend = new(true)
-	fc := fakecluster.New(t, fakecluster.WithObjects(cj), fakecluster.FailOn("update", "cronjobs", 0, errInvalid))
+	fc := fakecluster.New(t, fakecluster.WithObjects(cj), fakecluster.FailOn("patch", "cronjobs", 0, errInvalid))
 	s := NewSimApp(t, fc, SimNamespace("ns1"), SimView("cj"))
 	selectPath(t, s, "ns1/cj-a")
 	fc.Reset()
 
 	s.Keys(ui.KeyS)
+	s.Eventually(s.DialogOpen, "no resume dialog")
 	assert.Contains(t, s.Screen(), "Resume")
 	confirmOK(t, s)
 
-	s.Eventually(flashHas(s, "Cronjob resume failed for boom"), "no resume flash")
-	assert.Len(t, fc.Actions("update", "cronjobs"), 1)
+	s.Eventually(flashHas(s, "boom"), "no resume flash")
+	assert.Len(t, fc.Actions("patch", "cronjobs"), 1)
 }
 
 func TestSimpleDeleteInvalid(t *testing.T) {

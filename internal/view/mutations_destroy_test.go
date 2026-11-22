@@ -256,13 +256,11 @@ func TestCronJobKeys(t *testing.T) {
 		fc.Reset()
 		selectPath(t, s, "ns1/cj-a")
 		s.Keys(ui.KeyS)
-		require.True(t, s.DialogOpen())
+		s.Eventually(s.DialogOpen, "no suspend dialog")
 		assert.Contains(t, s.Screen(), "Suspend")
 		s.Keys(tcell.KeyTab, tcell.KeyEnter)
-		s.Eventually(func() bool { return len(fc.Actions("update", "cronjobs")) == 1 }, "no suspend update")
-		got := fc.Actions("update", "cronjobs")[0].(k8stesting.UpdateAction).GetObject().(*batchv1.CronJob)
-		require.NotNil(t, got.Spec.Suspend)
-		assert.True(t, *got.Spec.Suspend)
+		s.Eventually(func() bool { return len(patches(fc, "cronjobs")) == 1 }, "no suspend patch")
+		assert.JSONEq(t, `{"spec":{"suspend":true}}`, patches(fc, "cronjobs")[0])
 	})
 }
 
