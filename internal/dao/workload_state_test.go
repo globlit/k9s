@@ -24,7 +24,7 @@ func TestSetWorkloadState(t *testing.T) {
 		var obj runtime.Object = mutCronJob("job", new(false))
 		if deployment {
 			gvr, field = client.DpGVR, "paused"
-			obj = &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "job", Namespace: "ns1"}}
+			obj = &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "job", Namespace: "ns1", UID: "job-uid"}}
 		}
 		for _, state := range []bool{true, false} {
 			for _, deny := range []bool{false, true} {
@@ -34,7 +34,7 @@ func TestSetWorkloadState(t *testing.T) {
 				}
 				fc := fakecluster.New(t, opts...)
 				f := mutFactory(t, fc.Conn())
-				var apply func(context.Context, string, bool) error
+				var apply func(context.Context, string, types.UID, bool) error
 				if deployment {
 					var d Deployment
 					d.Init(f, gvr)
@@ -44,7 +44,7 @@ func TestSetWorkloadState(t *testing.T) {
 					c.Init(f, gvr)
 					apply = c.SetSuspend
 				}
-				err := apply(context.Background(), "ns1/job", state)
+				err := apply(context.Background(), "ns1/job", "job-uid", state)
 				if deny {
 					require.ErrorContains(t, err, "not authorized")
 					assert.Empty(t, fc.Actions("patch", gvr.R()))
@@ -54,19 +54,19 @@ func TestSetWorkloadState(t *testing.T) {
 				actions := fc.Actions("patch", gvr.R())
 				require.Len(t, actions, 1)
 				patch := actions[0].(k8stesting.PatchAction)
-				assert.Equal(t, types.MergePatchType, patch.GetPatchType())
+				assert.Equal(t, types.JSONPatchType, patch.GetPatchType())
 				want := "false"
 				if state {
 					want = "true"
 				}
-				assert.JSONEq(t, `{"spec":{"`+field+`":`+want+`}}`, string(patch.GetPatch()))
+				assert.JSONEq(t, `[{"op":"test","path":"/metadata/uid","value":"job-uid"},{"op":"add","path":"/spec/`+field+`","value":`+want+`}]`, string(patch.GetPatch()))
 			}
 		}
 	}
 }
 
 func TestWorkloadStateErrors(t *testing.T) {
-	for _, kind := range []string{"missing", "patch", "auth", "dial", "invalid-path"} {
+	for _, kind := range []string{"missing", "patch", "auth", "dial", "invalid-path", "missing-uid", "replacement"} {
 		t.Run(kind, func(t *testing.T) {
 			opts := []fakecluster.Option{fakecluster.WithObjects(mutCronJob("job", nil))}
 			if kind == "patch" {
@@ -87,10 +87,17 @@ func TestWorkloadStateErrors(t *testing.T) {
 			if kind == "invalid-path" {
 				path = ""
 			}
+			uid := types.UID("job-uid")
+			if kind == "missing-uid" {
+				uid = ""
+			}
+			if kind == "replacement" {
+				uid = "original-uid"
+			}
 			var c CronJob
 			c.Init(mutFactory(t, conn), client.CjGVR)
-			require.Error(t, c.SetSuspend(context.Background(), path, true))
-			if kind != "missing" && kind != "patch" {
+			require.Error(t, c.SetSuspend(context.Background(), path, uid, true))
+			if kind != "missing" && kind != "patch" && kind != "replacement" {
 				assert.Empty(t, fc.Actions("patch", "cronjobs"))
 			}
 		})

@@ -14,16 +14,19 @@ import (
 )
 
 // SetPaused sets the requested Deployment state without toggling each item.
-func (d *Deployment) SetPaused(ctx context.Context, path string, paused bool) error {
-	return patchWorkloadState(ctx, &d.Generic, path, "paused", paused)
+func (d *Deployment) SetPaused(ctx context.Context, path string, uid types.UID, paused bool) error {
+	return patchWorkloadState(ctx, &d.Generic, path, uid, "paused", paused)
 }
 
 // SetSuspend sets the requested CronJob state without replacing its spec.
-func (c *CronJob) SetSuspend(ctx context.Context, path string, suspended bool) error {
-	return patchWorkloadState(ctx, &c.Generic, path, "suspend", suspended)
+func (c *CronJob) SetSuspend(ctx context.Context, path string, uid types.UID, suspended bool) error {
+	return patchWorkloadState(ctx, &c.Generic, path, uid, "suspend", suspended)
 }
 
-func patchWorkloadState(ctx context.Context, g *Generic, path, field string, value bool) error {
+func patchWorkloadState(ctx context.Context, g *Generic, path string, uid types.UID, field string, value bool) error {
+	if uid == "" {
+		return fmt.Errorf("workload %s has no UID; refresh before changing its state", path)
+	}
 	ns, name := client.Namespaced(path)
 	if ns == "" || name == "" || client.IsClusterScoped(ns) {
 		return fmt.Errorf("invalid workload path %q", path)
@@ -39,10 +42,13 @@ func patchWorkloadState(ctx context.Context, g *Generic, path, field string, val
 	if err != nil {
 		return err
 	}
-	patch, err := json.Marshal(map[string]any{"spec": map[string]bool{field: value}})
+	patch, err := json.Marshal([]map[string]any{
+		{"op": "test", "path": "/metadata/uid", "value": uid},
+		{"op": "add", "path": "/spec/" + field, "value": value},
+	})
 	if err != nil {
 		return err
 	}
-	_, err = dial.Namespace(ns).Patch(ctx, name, types.MergePatchType, patch, metav1.PatchOptions{})
+	_, err = dial.Namespace(ns).Patch(ctx, name, types.JSONPatchType, patch, metav1.PatchOptions{})
 	return err
 }

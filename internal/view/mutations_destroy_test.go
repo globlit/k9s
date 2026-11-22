@@ -260,7 +260,7 @@ func TestCronJobKeys(t *testing.T) {
 		assert.Contains(t, s.Screen(), "Suspend")
 		s.Keys(tcell.KeyTab, tcell.KeyEnter)
 		s.Eventually(func() bool { return len(patches(fc, "cronjobs")) == 1 }, "no suspend patch")
-		assert.JSONEq(t, `{"spec":{"suspend":true}}`, patches(fc, "cronjobs")[0])
+		assert.JSONEq(t, `[{"op":"test","path":"/metadata/uid","value":"cj-uid"},{"op":"add","path":"/spec/suspend","value":true}]`, patches(fc, "cronjobs")[0])
 	})
 }
 

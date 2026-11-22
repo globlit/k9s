@@ -29,9 +29,9 @@ func TestPinnedActionClient(t *testing.T) {
 		var resource CronJob
 		resource.Init(mutFactory(t, conn), client.CjGVR)
 		require.NoError(t, resource.PinClient())
-		require.NoError(t, resource.SetSuspend(context.Background(), "ns1/a", true))
+		require.NoError(t, resource.SetSuspend(context.Background(), "ns1/a", "a-uid", true))
 		conn.dynamic = other.Dyn()
-		require.NoError(t, resource.SetSuspend(context.Background(), "ns1/b", true))
+		require.NoError(t, resource.SetSuspend(context.Background(), "ns1/b", "b-uid", true))
 		assert.Len(t, original.Actions("patch", "cronjobs"), 2)
 		assert.Empty(t, other.Actions("patch", "cronjobs"))
 	})
