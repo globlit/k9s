@@ -25,7 +25,7 @@ const (
 	envPprofAddr = "K9S_PPROF_ADDR"
 
 	// defaultMemoryLimit sets the soft memory limit when GOMEMLIMIT is unset.
-	defaultMemoryLimit = 2 << 30
+	defaultMemoryLimit int64 = 2 << 30
 )
 
 // startProfiling enables opt-in profiling and returns a flush func.
