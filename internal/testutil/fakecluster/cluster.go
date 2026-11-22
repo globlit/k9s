@@ -65,11 +65,17 @@ type Cluster struct {
 	policies   []Policy
 	failures   []*failure
 
+	serve  bool
+	srvURL string
+
 	connected atomic.Bool
 	canICalls atomic.Int64
 
-	recMx sync.Mutex
-	calls []Call
+	pseudoCanIs []string
+	recMx       sync.Mutex
+	calls       []Call
+	rest        []string
+	hooks       []Handler
 }
 
 // WithObjects seeds objects. Typed objects go to the typed and dynamic stores.
@@ -193,6 +199,9 @@ func New(t testing.TB, opts ...Option) *Cluster {
 			c.byGVK[r.gvk()] = r
 		}
 	}
+	if c.serve {
+		c.startServer()
+	}
 	c.cfg = client.NewConfig(c.flags())
 	c.build()
 	c.seed()
@@ -205,7 +214,11 @@ func (c *Cluster) flags() *genericclioptions.ConfigFlags {
 	path := filepath.Join(c.t.TempDir(), "kubeconfig")
 	var b strings.Builder
 	b.WriteString("apiVersion: v1\nkind: Config\n")
-	b.WriteString("clusters:\n- name: fake\n  cluster:\n    server: https://127.0.0.1:1\n")
+	server := "https://127.0.0.1:1"
+	if c.srvURL != "" {
+		server = c.srvURL
+	}
+	fmt.Fprintf(&b, "clusters:\n- name: fake\n  cluster:\n    server: %s\n", server)
 	b.WriteString("users:\n- name: fake\n  user:\n    token: fake\n")
 	b.WriteString("contexts:\n")
 	for _, ct := range c.contexts {
@@ -238,6 +251,9 @@ func (c *Cluster) build() {
 	}
 	c.dyn = dynfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), listKinds)
 	c.mx = mxfake.NewSimpleClientset()
+	if c.serve {
+		c.dyn.PrependReactor("*", "*", c.scaleReaction)
+	}
 
 	// Prepend order matters: the last one runs first.
 	if c.mirror {

@@ -344,3 +344,18 @@ func TestConnBasics(t *testing.T) {
 	assert.False(t, conn.ConnectionOK())
 	assert.False(t, conn.CheckConnectivity())
 }
+
+func TestPseudoCanIs(t *testing.T) {
+	c := fakecluster.New(t)
+	conn := c.Conn()
+
+	_, err := conn.CanI("ns1", client.PfGVR, "", []string{"list"})
+	require.NoError(t, err)
+	_, err = conn.CanI("ns1", client.PodGVR, "", []string{"list"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{client.PfGVR.String()}, c.PseudoCanIs())
+	assert.Equal(t, 2, c.CanICalls())
+
+	c.Reset()
+	assert.Empty(t, c.PseudoCanIs())
+}

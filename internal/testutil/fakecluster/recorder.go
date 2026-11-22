@@ -99,10 +99,10 @@ func (c *Cluster) Deletes() []DeleteCall {
 // CanICalls returns how many times CanI was called.
 func (c *Cluster) CanICalls() int { return int(c.canICalls.Load()) }
 
-// Reset clears the recorded calls and the CanI counter.
+// Reset clears the recorded calls, REST calls and the CanI counter.
 func (c *Cluster) Reset() {
 	c.recMx.Lock()
-	c.calls = nil
+	c.calls, c.rest, c.pseudoCanIs = nil, nil, nil
 	c.recMx.Unlock()
 	c.canICalls.Store(0)
 	c.typed.ClearActions()

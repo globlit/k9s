@@ -46,6 +46,14 @@ func (c *Cluster) PseudoCalls() []Call {
 	return out
 }
 
+// PseudoCanIs returns the GVRs of the CanI checks made on k9s pseudo resources.
+func (c *Cluster) PseudoCanIs() []string {
+	c.recMx.Lock()
+	defer c.recMx.Unlock()
+
+	return append([]string(nil), c.pseudoCanIs...)
+}
+
 // pseudoDyn wraps the dynamic fake. The fake panics on a list of an unknown
 // resource. Record such calls and fail them with not found instead.
 type pseudoDyn struct {

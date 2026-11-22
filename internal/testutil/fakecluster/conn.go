@@ -28,6 +28,11 @@ type Conn struct {
 // CanI checks the RBAC policies and counts the call.
 func (k *Conn) CanI(ns string, gvr *client.GVR, n string, verbs []string) (bool, error) {
 	k.c.canICalls.Add(1)
+	if isPseudo(gvr.GVR()) {
+		k.c.recMx.Lock()
+		k.c.pseudoCanIs = append(k.c.pseudoCanIs, gvr.String())
+		k.c.recMx.Unlock()
+	}
 	for _, v := range verbs {
 		if !k.c.allowed(ns, gvr, n, v) {
 			return false, nil
@@ -65,7 +70,8 @@ func (k *Conn) CachedDiscovery() (discovery.CachedDiscoveryInterface, error) {
 	return k.c.disc, nil
 }
 
-// RestConfig returns a config that points at a closed local port.
+// RestConfig returns a config for the fake API server. Without
+// WithAPIServer, it points at a closed local port.
 func (k *Conn) RestConfig() (*restclient.Config, error) { return k.c.cfg.RESTConfig() }
 
 // MXDial returns the metrics fake.
