@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 )
 
+// jsonMarshal lets tests inject a marshal failure.
+var jsonMarshal = json.Marshal
+
 // ImageSpec represents a container image.
 type ImageSpec struct {
 	Index             int
@@ -53,13 +56,13 @@ func GetTemplateJsonPatch(imageSpecs ImageSpecs) ([]byte, error) {
 			Template: getPatchPodSpec(imageSpecs),
 		},
 	}
-	return json.Marshal(jsonPatch)
+	return jsonMarshal(jsonPatch)
 }
 
 // GetJsonPatch returns container image patch.
 func GetJsonPatch(imageSpecs ImageSpecs) ([]byte, error) {
 	podSpec := getPatchPodSpec(imageSpecs)
-	return json.Marshal(podSpec)
+	return jsonMarshal(podSpec)
 }
 
 func getPatchPodSpec(imageSpecs ImageSpecs) PodSpec {

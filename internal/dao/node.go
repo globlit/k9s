@@ -24,6 +24,9 @@ import (
 	mv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 )
 
+// cordonPatch lets tests inject a cordon patch build failure.
+var cordonPatch = (*drain.CordonHelper).PatchOrReplace
+
 var (
 	_ Accessor       = (*Node)(nil)
 	_ NodeMaintainer = (*Node)(nil)
@@ -69,7 +72,7 @@ func (n *Node) ToggleCordon(fqn string, cordon bool) error {
 		return err
 	}
 
-	err, patchErr := h.PatchOrReplace(dial, false)
+	err, patchErr := cordonPatch(h, dial, false)
 	if patchErr != nil {
 		return patchErr
 	}
