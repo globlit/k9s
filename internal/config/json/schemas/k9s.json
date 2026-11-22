@@ -144,6 +144,8 @@
             "disableAutoscroll": {"type": "boolean"},
             "columnLock": {"type": "boolean"},
             "showTime": {"type": "boolean"},
+            "json": {"type": "boolean"},
+            "jsonFields": {"type": "array", "items": {"type": "string"}},
             "logBufferSize": {"type": "integer"}
           }
         },

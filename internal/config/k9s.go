@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -515,7 +516,7 @@ func (k *K9s) Validate(c client.Connection, contextName, clusterName string) {
 	if d := k.DebugContainer.Validate(); d != k.DebugContainer {
 		k.DebugContainer = d
 	}
-	if l := k.Logger.Validate(); l != k.Logger {
+	if l := k.Logger.Validate(); !reflect.DeepEqual(l, k.Logger) {
 		k.Logger = l
 	}
 	if k.Thresholds == nil {

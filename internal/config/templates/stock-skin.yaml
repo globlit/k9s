@@ -100,9 +100,23 @@ k9s:
       mainColor: white
       focusColor: aqua
       shortcutColor: aqua
+    diff:
+      add: seagreen
+      remove: indianred
+      header: steelblue
     logs:
       fgColor: lightskyblue
       bgColor: black
+      json:
+        key: slategray
+        string: steelblue
+        number: darkorchid
+        bool: teal
+        "null": gray
+        levelError: indianred
+        levelWarn: darkgoldenrod
+        levelInfo: seagreen
+        levelDebug: gray
       indicator:
         fgColor: dodgerblue
         bgColor: black

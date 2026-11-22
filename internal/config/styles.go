@@ -140,6 +140,7 @@ type (
 		Yaml   Yaml   `json:"yaml" yaml:"yaml"`
 		Picker Picker `json:"picker" yaml:"picker"`
 		Log    Log    `json:"logs" yaml:"logs"`
+		Diff   Diff   `json:"diff" yaml:"diff"`
 	}
 
 	// Status tracks resource status styles.
@@ -159,6 +160,27 @@ type (
 		FgColor   Color        `json:"fgColor" yaml:"fgColor"`
 		BgColor   Color        `json:"bgColor" yaml:"bgColor"`
 		Indicator LogIndicator `json:"indicator" yaml:"indicator"`
+		JSON      JSONLog      `json:"json" yaml:"json"`
+	}
+
+	// Diff colors added, removed and context headers in unified diffs.
+	Diff struct {
+		Add    Color `json:"add" yaml:"add"`
+		Remove Color `json:"remove" yaml:"remove"`
+		Header Color `json:"header" yaml:"header"`
+	}
+
+	// JSONLog colors structured log fields by key, value type and severity.
+	JSONLog struct {
+		Key        Color `json:"key" yaml:"key"`
+		String     Color `json:"string" yaml:"string"`
+		Number     Color `json:"number" yaml:"number"`
+		Bool       Color `json:"bool" yaml:"bool"`
+		Null       Color `json:"null" yaml:"null"`
+		LevelError Color `json:"levelError" yaml:"levelError"`
+		LevelWarn  Color `json:"levelWarn" yaml:"levelWarn"`
+		LevelInfo  Color `json:"levelInfo" yaml:"levelInfo"`
+		LevelDebug Color `json:"levelDebug" yaml:"levelDebug"`
 	}
 
 	// Picker tracks color when selecting containers
@@ -323,6 +345,7 @@ func newViews() Views {
 		Yaml:   newYaml(),
 		Picker: newPicker(),
 		Log:    newLog(),
+		Diff:   Diff{Add: "seagreen", Remove: "indianred", Header: "steelblue"},
 	}
 }
 
@@ -384,6 +407,7 @@ func newLog() Log {
 		FgColor:   colorLightSkyBlue,
 		BgColor:   colorBlack,
 		Indicator: newLogIndicator(),
+		JSON:      NewJSONLog(),
 	}
 }
 
@@ -709,6 +733,9 @@ func (v *Views) Invert() {
 	v.Yaml.Invert()
 	v.Picker.Invert()
 	v.Log.Invert()
+	v.Diff.Add = v.Diff.Add.InvertColor()
+	v.Diff.Remove = v.Diff.Remove.InvertColor()
+	v.Diff.Header = v.Diff.Header.InvertColor()
 }
 
 // Invert inverts all colors in Table.
@@ -768,6 +795,7 @@ func (p *Picker) Invert() {
 
 // Invert inverts all colors in Log.
 func (l *Log) Invert() {
+	l.JSON.Invert()
 	l.FgColor = l.FgColor.InvertColor()
 	l.BgColor = l.BgColor.InvertColor()
 	l.Indicator.Invert()
@@ -823,4 +851,26 @@ func (s *Styles) Update() {
 func (s *Styles) Dump() {
 	bb, _ := yaml.Marshal(s)
 	fmt.Println(string(bb))
+}
+
+// NewJSONLog returns the default structured log palette.
+func NewJSONLog() JSONLog {
+	// Mid-tone colors remain visible on both dark and light skin backgrounds.
+	return JSONLog{
+		Key: "slategray", String: "steelblue", Number: "darkorchid", Bool: "teal", Null: "gray",
+		LevelError: "indianred", LevelWarn: "darkgoldenrod", LevelInfo: "seagreen", LevelDebug: "gray",
+	}
+}
+
+// Invert adapts structured log colors to an inverted skin.
+func (j *JSONLog) Invert() {
+	j.Key = j.Key.InvertColor()
+	j.String = j.String.InvertColor()
+	j.Number = j.Number.InvertColor()
+	j.Bool = j.Bool.InvertColor()
+	j.Null = j.Null.InvertColor()
+	j.LevelError = j.LevelError.InvertColor()
+	j.LevelWarn = j.LevelWarn.InvertColor()
+	j.LevelInfo = j.LevelInfo.InvertColor()
+	j.LevelDebug = j.LevelDebug.InvertColor()
 }

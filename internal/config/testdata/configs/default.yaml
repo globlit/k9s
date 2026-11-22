@@ -36,6 +36,7 @@ k9s:
     image: busybox:1.37.0
     profile: general
   logger:
+    json: false
     tail: 100
     buffer: 5000
     sinceSeconds: -1

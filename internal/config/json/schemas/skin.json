@@ -160,11 +160,23 @@
                   "valueColor": {"type": "string"}
                 }
               },
+              "diff": {"type":"object", "additionalProperties":false, "properties": {"add":{"type":"string"},"remove":{"type":"string"},"header":{"type":"string"}}},
               "logs": {
                 "type": "object",
                 "properties": {
                   "fgColor": {"type": "string"},
                   "bgColor": {"type": "string"},
+                  "json": {"type": "object", "additionalProperties": false, "properties": {
+                    "key": {"type": "string"},
+                    "string": {"type": "string"},
+                    "number": {"type": "string"},
+                    "bool": {"type": "string"},
+                    "null": {"type": "string"},
+                    "levelError": {"type": "string"},
+                    "levelWarn": {"type": "string"},
+                    "levelInfo": {"type": "string"},
+                    "levelDebug": {"type": "string"}
+                  }},
                   "indicator": {
                     "type": "object",
                     "additionalProperties": {

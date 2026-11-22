@@ -19,14 +19,16 @@ const (
 
 // Logger tracks logger options.
 type Logger struct {
-	TailCount         int64 `json:"tail" yaml:"tail"`
-	BufferSize        int   `json:"buffer" yaml:"buffer"`
-	SinceSeconds      int64 `json:"sinceSeconds" yaml:"sinceSeconds"`
-	TextWrap          bool  `json:"textWrap" yaml:"textWrap"`
-	DisableAutoscroll bool  `json:"disableAutoscroll" yaml:"disableAutoscroll"`
-	ColumnLock        bool  `json:"columnLock" yaml:"columnLock"`
-	ShowTime          bool  `json:"showTime" yaml:"showTime"`
-	LogBufferSize     int   `json:"logBufferSize" yaml:"logBufferSize"`
+	JSON              bool     `json:"json" yaml:"json"`
+	JSONFields        []string `json:"jsonFields,omitempty" yaml:"jsonFields,omitempty"`
+	TailCount         int64    `json:"tail" yaml:"tail"`
+	BufferSize        int      `json:"buffer" yaml:"buffer"`
+	SinceSeconds      int64    `json:"sinceSeconds" yaml:"sinceSeconds"`
+	TextWrap          bool     `json:"textWrap" yaml:"textWrap"`
+	DisableAutoscroll bool     `json:"disableAutoscroll" yaml:"disableAutoscroll"`
+	ColumnLock        bool     `json:"columnLock" yaml:"columnLock"`
+	ShowTime          bool     `json:"showTime" yaml:"showTime"`
+	LogBufferSize     int      `json:"logBufferSize" yaml:"logBufferSize"`
 }
 
 // NewLogger returns a new instance.
