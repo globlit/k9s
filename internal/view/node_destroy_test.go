@@ -242,7 +242,8 @@ func shellPodConfig() *config.ShellPod {
 }
 
 func TestNodeShellPodSpec(t *testing.T) {
-	po := k9sShellPod("n1", shellPodConfig())
+	po, err := k9sShellPod("n1", shellPodConfig())
+	require.NoError(t, err)
 
 	assert.Equal(t, k9sShellPodName(), po.Name)
 	assert.Equal(t, "ns1", po.Namespace)
@@ -271,11 +272,12 @@ func TestNodeShellPodSpec(t *testing.T) {
 }
 
 func TestNodeShellPodPartialLimits(t *testing.T) {
-	t.Skip("bug: a shell pod config with only a memory limit panics in resource.MustParse")
 	cfg := shellPodConfig()
 	cfg.Limits = config.Limits{corev1.ResourceMemory: "64Mi"}
 
-	assert.NotPanics(t, func() { k9sShellPod("n1", cfg) })
+	po, err := k9sShellPod("n1", cfg)
+	require.ErrorContains(t, err, "missing shell pod cpu limit")
+	assert.Nil(t, po)
 }
 
 // shellApp starts an app with the node shell feature on.

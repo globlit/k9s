@@ -444,10 +444,11 @@ func nukeK9sShell(a *App) error {
 const nodeShellDeleteTimeout = 10 * time.Second
 
 func launchShellPod(ctx context.Context, a *App, node string) (err error) {
-	var (
-		spo  = a.Config.K9s.ShellPod
-		spec = k9sShellPod(node, spo)
-	)
+	spo := a.Config.K9s.ShellPod
+	spec, err := k9sShellPod(node, spo)
+	if err != nil {
+		return err
+	}
 
 	dial, err := a.Conn().Dial()
 	if err != nil {
@@ -525,9 +526,14 @@ func k9sShellPodName() string {
 	return fmt.Sprintf("%s-%d", k9sShell, os.Getpid())
 }
 
-func k9sShellPod(node string, cfg *config.ShellPod) *v1.Pod {
+func k9sShellPod(node string, cfg *config.ShellPod) (*v1.Pod, error) {
 	var grace int64
 	var priv = true
+
+	res, err := asResource(cfg.Limits)
+	if err != nil {
+		return nil, err
+	}
 
 	slog.Debug("Shell pod config", slogs.ShellPodCfg, cfg)
 	c := v1.Container{
@@ -541,7 +547,7 @@ func k9sShellPod(node string, cfg *config.ShellPod) *v1.Pod {
 				ReadOnly:  true,
 			},
 		},
-		Resources: asResource(cfg.Limits),
+		Resources: res,
 		Stdin:     true,
 		TTY:       cfg.TTY,
 		SecurityContext: &v1.SecurityContext{
@@ -602,16 +608,23 @@ func k9sShellPod(node string, cfg *config.ShellPod) *v1.Pod {
 				},
 			},
 		},
-	}
+	}, nil
 }
 
-func asResource(r config.Limits) v1.ResourceRequirements {
-	return v1.ResourceRequirements{
-		Limits: v1.ResourceList{
-			v1.ResourceCPU:    resource.MustParse(r[v1.ResourceCPU]),
-			v1.ResourceMemory: resource.MustParse(r[v1.ResourceMemory]),
-		},
+func asResource(r config.Limits) (v1.ResourceRequirements, error) {
+	ll := make(v1.ResourceList, len(r))
+	for _, n := range []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory} {
+		if r[n] == "" {
+			return v1.ResourceRequirements{}, fmt.Errorf("missing shell pod %s limit", n)
+		}
+		q, err := resource.ParseQuantity(r[n])
+		if err != nil {
+			return v1.ResourceRequirements{}, fmt.Errorf("invalid shell pod %s limit %q: %w", n, r[n], err)
+		}
+		ll[n] = q
 	}
+
+	return v1.ResourceRequirements{Limits: ll}, nil
 }
 
 // pipe runs cmds, chaining stdout to stdin. Always close statusChan on
