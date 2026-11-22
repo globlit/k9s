@@ -264,3 +264,15 @@ func TestCustCol_parse(t *testing.T) {
 		})
 	}
 }
+
+func TestCustomQuotaColumnName(t *testing.T) {
+	for _, name := range []string{"CPU(R)", "MEM(L)", "CPU(MIN)", "MEM(DEFAULT)"} {
+		t.Run(name, func(t *testing.T) {
+			def, err := parse(name + "|R")
+			assert.NoError(t, err)
+			assert.Equal(t, name, def.name)
+			assert.Empty(t, def.spec)
+			assert.Equal(t, tview.AlignRight, def.align)
+		})
+	}
+}

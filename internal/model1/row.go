@@ -3,13 +3,18 @@
 
 package model1
 
-import "time"
+import (
+	"time"
+
+	"github.com/globlit/k9s/internal/config"
+)
 
 // Row represents a collection of columns.
 type Row struct {
-	ID     string
-	Fields Fields
-	Age    time.Time
+	ID       string
+	Fields   Fields
+	Age      time.Time
+	Severity config.SeverityLevel
 }
 
 // NewRow returns a new row with initialized fields.
@@ -21,6 +26,7 @@ func NewRow(size int) Row {
 func (r Row) Labelize(cols []int, labelCol int, labels []string) Row {
 	out := NewRow(len(cols) + len(labels))
 	out.Age = r.Age
+	out.Severity = r.Severity
 	for _, col := range cols {
 		out.Fields = append(out.Fields, r.Fields[col])
 	}
@@ -38,13 +44,14 @@ func (r Row) Customize(cols []int) Row {
 	r.Fields.Customize(cols, out.Fields)
 	out.ID = r.ID
 	out.Age = r.Age
+	out.Severity = r.Severity
 
 	return out
 }
 
 // Diff returns true if row differ or false otherwise.
 func (r Row) Diff(ro Row, ageCol int) bool {
-	if r.ID != ro.ID {
+	if r.ID != ro.ID || r.Severity != ro.Severity {
 		return true
 	}
 	return r.Fields.Diff(ro.Fields, ageCol)
@@ -53,9 +60,10 @@ func (r Row) Diff(ro Row, ageCol int) bool {
 // Clone copies a row.
 func (r Row) Clone() Row {
 	return Row{
-		ID:     r.ID,
-		Fields: r.Fields.Clone(),
-		Age:    r.Age,
+		ID:       r.ID,
+		Fields:   r.Fields.Clone(),
+		Age:      r.Age,
+		Severity: r.Severity,
 	}
 }
 

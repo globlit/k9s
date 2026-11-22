@@ -52,6 +52,9 @@ func (t *Table) Init(ctx context.Context) (err error) {
 	ctx = context.WithValue(ctx, internal.KeyStyles, t.app.Styles)
 	ctx = context.WithValue(ctx, internal.KeyViewConfig, t.app.CustomView())
 	t.Table.Init(ctx)
+	if table, ok := t.GetModel().(*model.Table); ok && t.GVR() == client.RqGVR {
+		table.SetThresholds(t.app.Config.K9s.Thresholds)
+	}
 	if !t.app.Config.K9s.UI.Reactive {
 		if err := t.app.RefreshCustomViews(); err != nil {
 			slog.Warn("CustomViews load failed", slogs.Error, err)

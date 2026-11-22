@@ -225,12 +225,8 @@ func (t *TableData) fuzzyFilter(q string) *RowEvents {
 
 func (t *TableData) filterToast() *RowEvents {
 	rr := NewRowEvents(10)
-	idx, ok := t.header.IndexOf("VALID", true)
-	if !ok {
-		return rr
-	}
 	t.rowEvents.Range(func(_ int, re RowEvent) bool {
-		if re.Row.Fields[idx] != "" {
+		if !IsValid(t.namespace, t.header, re.Row) {
 			rr.Add(&re)
 		}
 		return true

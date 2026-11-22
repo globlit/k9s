@@ -14,6 +14,7 @@ import (
 	"sync"
 
 	"github.com/fvbommel/sortorder"
+	"github.com/globlit/k9s/internal/config"
 	"github.com/globlit/k9s/internal/slogs"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -92,6 +93,9 @@ func handleRenderErr(err error) error {
 
 // IsValid returns true if resource is valid, false otherwise.
 func IsValid(_ string, h Header, r Row) bool {
+	if r.Severity == config.SeverityHigh {
+		return false
+	}
 	if len(r.Fields) == 0 {
 		return true
 	}

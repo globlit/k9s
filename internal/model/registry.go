@@ -90,6 +90,8 @@ var Registry = map[*client.GVR]ResourceMeta{
 	},
 
 	// Core...
+	client.RqGVR: {Renderer: new(render.ResourceQuota)},
+	client.LrGVR: {Renderer: new(render.LimitRange)},
 	client.EpGVR: {
 		Renderer: new(render.Endpoints),
 	},

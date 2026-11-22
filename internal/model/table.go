@@ -17,6 +17,7 @@ import (
 	"github.com/globlit/k9s/internal/config"
 	"github.com/globlit/k9s/internal/dao"
 	"github.com/globlit/k9s/internal/model1"
+	"github.com/globlit/k9s/internal/render"
 	"github.com/globlit/k9s/internal/slogs"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -48,6 +49,7 @@ type Table struct {
 	labelSelector labels.Selector
 	mx            sync.RWMutex
 	vs            *config.ViewSetting
+	thresholds    config.Threshold
 }
 
 // NewTable returns a new table model.
@@ -57,6 +59,20 @@ func NewTable(gvr *client.GVR) *Table {
 		data:        model1.NewTableData(gvr),
 		refreshRate: 2 * time.Second,
 	}
+}
+
+// SetThresholds snapshots quota thresholds so render workers never share mutable config.
+func (t *Table) SetThresholds(thresholds config.Threshold) {
+	snapshot := make(config.Threshold, len(thresholds))
+	for key, severity := range thresholds {
+		if severity != nil {
+			value := *severity
+			snapshot[key] = &value
+		}
+	}
+	t.mx.Lock()
+	t.thresholds = snapshot
+	t.mx.Unlock()
 }
 
 func (t *Table) SetViewSetting(ctx context.Context, vs *config.ViewSetting) {
@@ -274,6 +290,7 @@ func (t *Table) reconcile(ctx context.Context) error {
 	meta := resourceMeta(t.gvr)
 	t.mx.RLock()
 	vs := t.vs
+	thresholds := t.thresholds
 	t.mx.RUnlock()
 	// Request full objects for custom columns only: they inflate payloads.
 	if vs != nil && vs.HasCols() {
@@ -291,6 +308,9 @@ func (t *Table) reconcile(ctx context.Context) error {
 	}
 	r := meta.Renderer
 	r.SetViewSetting(vs)
+	if quota, ok := r.(*render.ResourceQuota); ok {
+		quota.Thresholds = thresholds
+	}
 
 	return t.data.Render(ctx, meta.Renderer, oo)
 }

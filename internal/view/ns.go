@@ -37,8 +37,19 @@ func NewNamespace(gvr *client.GVR) ResourceViewer {
 
 func (n *Namespace) bindKeys(aa *ui.KeyActions) {
 	aa.Bulk(ui.KeyMap{
-		ui.KeyU: ui.NewKeyAction("Use", n.useNsCmd, true),
+		ui.KeyShiftQ: ui.NewKeyAction("Quotas", n.quotasCmd, true),
+		ui.KeyU:      ui.NewKeyAction("Use", n.useNsCmd, true),
 	})
+}
+
+func (n *Namespace) quotasCmd(*tcell.EventKey) *tcell.EventKey {
+	path := n.GetTable().GetSelectedItem()
+	if path == "" {
+		return nil
+	}
+	_, ns := client.Namespaced(path)
+	n.App().gotoResource(client.RqGVR.String()+" "+ns, "", false, true)
+	return nil
 }
 
 func (n *Namespace) switchNs(app *App, _ ui.Tabular, _ *client.GVR, path string) {

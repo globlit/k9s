@@ -10,6 +10,8 @@ var (
 	RsGVR  = NewGVR("apps/v1/replicasets")
 
 	// Core...
+	RqGVR   = NewGVR("v1/resourcequotas")
+	LrGVR   = NewGVR("v1/limitranges")
 	RcGVR   = NewGVR("v1/replicationcontrollers")
 	SaGVR   = NewGVR("v1/serviceaccounts")
 	PvcGVR  = NewGVR("v1/persistentvolumeclaims")
