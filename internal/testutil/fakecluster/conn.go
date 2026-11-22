@@ -71,8 +71,11 @@ func (k *Conn) RestConfig() (*restclient.Config, error) { return k.c.cfg.RESTCon
 // MXDial returns the metrics fake.
 func (k *Conn) MXDial() (versioned.Interface, error) { return k.c.mx, nil }
 
-// DynDial returns the dynamic fake.
-func (k *Conn) DynDial() (dynamic.Interface, error) { return k.c.dyn, nil }
+// DynDial returns the dynamic fake. Calls on k9s pseudo resources fail
+// with not found, like on a real API server.
+func (k *Conn) DynDial() (dynamic.Interface, error) {
+	return &pseudoDyn{Interface: k.c.dyn, c: k.c}, nil
+}
 
 // HasMetrics reports if WithMetrics was given.
 func (k *Conn) HasMetrics() bool { return k.c.hasMetrics }
