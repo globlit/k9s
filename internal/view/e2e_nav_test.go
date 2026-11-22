@@ -226,6 +226,12 @@ func TestE2ENamespaceSwitch(t *testing.T) {
 		s.e2eGone("web-7d9-aaaaa")
 		assert.Equal(t, "ns-b", s.App().Config.ActiveNamespace())
 	})
+	t.Run("empty-fuzzy-command", func(t *testing.T) {
+		defer s.Use(t)()
+		s.e2eGoto(":pod ns-a -f' '", "Pod", "pods(ns-a)[3]")
+		s.e2eRowsAre("api-0", "web-7d9-aaaaa", "web-7d9-bbbbb")
+		assert.Equal(t, "ns-a", s.App().Config.ActiveNamespace())
+	})
 	t.Run("deploy", func(t *testing.T) {
 		defer s.Use(t)()
 		s.e2eGoto(":deploy ns-a", "Deployment", "deployments(ns-a)[1]")

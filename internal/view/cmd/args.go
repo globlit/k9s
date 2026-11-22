@@ -99,6 +99,9 @@ func (a args) String() string {
 		case filterKey:
 			v = quoteSpaced(filterFlag + v)
 		case fuzzyKey:
+			if v == "" {
+				continue
+			}
 			v = fuzzyFlag + " " + quoteSpaced(v)
 		case contextKey:
 			v = quoteSpaced(contextFlag + v)

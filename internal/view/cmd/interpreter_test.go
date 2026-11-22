@@ -237,6 +237,23 @@ func TestMergeKeepsFuzzyFilter(t *testing.T) {
 	}
 }
 
+func TestMergeEmptyFuzzyKeepsNamespace(t *testing.T) {
+	for _, previous := range []string{"pods ns1", "pods ns1 -f old"} {
+		t.Run(previous, func(t *testing.T) {
+			p := cmd.NewInterpreter(previous)
+			p.Merge(cmd.NewInterpreter("pods ns1 -f' '"))
+			assert.Equal(t, "pods ns1", p.GetLine())
+
+			reparsed := cmd.NewInterpreter(p.GetLine())
+			ns, ok := reparsed.NSArg()
+			assert.True(t, ok)
+			assert.Equal(t, "ns1", ns)
+			_, ok = reparsed.FuzzyArg()
+			assert.False(t, ok)
+		})
+	}
+}
+
 func TestFilterCmd(t *testing.T) {
 	uu := map[string]struct {
 		cmd    string
