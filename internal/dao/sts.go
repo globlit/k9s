@@ -94,7 +94,7 @@ func (s *StatefulSet) Pod(fqn string) (string, error) {
 		return "", err
 	}
 
-	return podFromSelector(s.Factory, sts.Namespace, sts.Spec.Selector.MatchLabels)
+	return podFromWorkloadSelector(s.Factory, sts.Namespace, sts.Spec.Selector)
 }
 
 func (s *StatefulSet) getStatefulSet(fqn string) (*appsv1.StatefulSet, error) {

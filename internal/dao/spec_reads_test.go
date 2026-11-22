@@ -289,3 +289,32 @@ func TestGetInstances(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "sts1", so.Name)
 }
+
+func TestPodNoSelector(t *testing.T) {
+	_, f := newDataFactory(t, fakecluster.WithObjects(
+		&appsv1.Deployment{ObjectMeta: om("dp1")},
+		&appsv1.DaemonSet{ObjectMeta: om("ds1"), Spec: appsv1.DaemonSetSpec{Selector: &metav1.LabelSelector{}}},
+		&appsv1.StatefulSet{ObjectMeta: om("sts1")},
+		&corev1.Pod{ObjectMeta: om("p1")},
+	))
+	uu := map[string]struct {
+		gvr *client.GVR
+		a   interface {
+			dao.Accessor
+			Pod(string) (string, error)
+		}
+		path string
+	}{
+		"dp":  {gvr: client.DpGVR, a: new(dao.Deployment), path: "ns1/dp1"},
+		"ds":  {gvr: client.DsGVR, a: new(dao.DaemonSet), path: "ns1/ds1"},
+		"sts": {gvr: client.StsGVR, a: new(dao.StatefulSet), path: "ns1/sts1"},
+	}
+	for k, u := range uu {
+		t.Run(k, func(t *testing.T) {
+			u.a.Init(f, u.gvr)
+			var err error
+			require.NotPanics(t, func() { _, err = u.a.Pod(u.path) })
+			require.ErrorContains(t, err, "no valid selector found")
+		})
+	}
+}

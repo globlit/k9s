@@ -80,7 +80,7 @@ func (d *Deployment) Pod(fqn string) (string, error) {
 		return "", err
 	}
 
-	return podFromSelector(d.Factory, dp.Namespace, dp.Spec.Selector.MatchLabels)
+	return podFromWorkloadSelector(d.Factory, dp.Namespace, dp.Spec.Selector)
 }
 
 // GetInstance fetch a matching deployment.

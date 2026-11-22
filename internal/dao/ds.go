@@ -117,7 +117,7 @@ func (d *DaemonSet) Pod(fqn string) (string, error) {
 		return "", err
 	}
 
-	return podFromSelector(d.Factory, ds.Namespace, ds.Spec.Selector.MatchLabels)
+	return podFromWorkloadSelector(d.Factory, ds.Namespace, ds.Spec.Selector)
 }
 
 // GetInstance returns a daemonset instance.

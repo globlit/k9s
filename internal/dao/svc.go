@@ -10,6 +10,7 @@ import (
 
 	"github.com/globlit/k9s/internal/client"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -69,7 +70,23 @@ func (s *Service) GetInstance(fqn string) (*v1.Service, error) {
 // Helpers...
 
 func podFromSelector(f Factory, ns string, sel map[string]string) (string, error) {
-	oo, err := f.List(client.PodGVR, ns, true, labels.Set(sel).AsSelector())
+	return podFromLabelSelector(f, ns, labels.Set(sel).AsSelector())
+}
+
+// Workload selectors may combine equality labels and set expressions.
+func podFromWorkloadSelector(f Factory, ns string, sel *metav1.LabelSelector) (string, error) {
+	if sel == nil || (len(sel.MatchLabels) == 0 && len(sel.MatchExpressions) == 0) {
+		return "", errors.New("no valid selector found on workload")
+	}
+	selector, err := metav1.LabelSelectorAsSelector(sel)
+	if err != nil {
+		return "", fmt.Errorf("invalid workload selector: %w", err)
+	}
+	return podFromLabelSelector(f, ns, selector)
+}
+
+func podFromLabelSelector(f Factory, ns string, sel labels.Selector) (string, error) {
+	oo, err := f.List(client.PodGVR, ns, true, sel)
 	if err != nil {
 		return "", err
 	}
