@@ -27,11 +27,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          build-cache: bench
 
       - name: Install benchstat
         run: go install "$BENCHSTAT"

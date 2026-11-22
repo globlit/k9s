@@ -24,11 +24,10 @@ jobs:
       - name: Check Release Note
         run: test -f "change_logs/release_${GITHUB_REF_NAME}.md"
 
-      - name: Install Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          build-cache: release
 
       - name: Install Syft
         uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
