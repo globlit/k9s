@@ -705,6 +705,9 @@ func (b *Browser) refreshActions() {
 		aa.Add(ui.KeyY, ui.NewKeyAction(yamlAction, b.viewCmd, true))
 		aa.Add(ui.KeyD, ui.NewKeyAction("Describe", b.describeCmd, true))
 	}
+	if dao.IsK8sMeta(b.meta) {
+		aa.Add(ui.KeyShiftE, ui.NewKeyAction("Events", b.eventsCmd, true))
+	}
 	for _, f := range b.bindKeysFn {
 		f(aa)
 	}
