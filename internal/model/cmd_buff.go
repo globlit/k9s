@@ -48,6 +48,7 @@ type CmdBuff struct {
 	kind       BufferKind
 	active     bool
 	cancel     context.CancelFunc
+	gen        uint64
 	queue      func(func())
 	mx         sync.RWMutex
 }
@@ -130,21 +131,27 @@ func (c *CmdBuff) debounce(delay time.Duration) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), delay)
 	c.cancel = cancel
-	queue := c.queue
+	gen, queue := c.gen, c.queue
 
 	go func() {
 		defer internal.LogPanic("cmd buffer")
 		<-ctx.Done()
 		if queue == nil {
-			c.applyPending()
+			c.applyPending(gen)
 			return
 		}
-		queue(func() { c.applyPending() })
+		queue(func() { c.applyPending(gen) })
 	}()
 }
 
-func (c *CmdBuff) applyPending() {
+// applyPending sends the current text.
+// It does nothing when a clear occurred after the debounce started.
+func (c *CmdBuff) applyPending(gen uint64) {
 	c.mx.Lock()
+	if c.gen != gen {
+		c.mx.Unlock()
+		return
+	}
 	c.cancel = nil
 	text, suggestion := string(c.buff), c.suggestion
 	c.mx.Unlock()
@@ -191,6 +198,11 @@ func (c *CmdBuff) Delete() {
 func (c *CmdBuff) ClearText(fire bool) {
 	c.mx.Lock()
 	c.buff, c.suggestion = c.buff[:0], ""
+	if c.cancel != nil {
+		c.cancel()
+		c.cancel = nil
+	}
+	c.gen++
 	c.mx.Unlock()
 
 	if fire {
