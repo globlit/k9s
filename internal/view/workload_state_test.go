@@ -96,3 +96,24 @@ func TestWorkloadStateRejectsReplacement(t *testing.T) {
 		})
 	}
 }
+
+// AccessorFor returns shared registry instances. Each action must pin a fresh
+// DAO, or a later factory can read and patch the previous cluster's CronJobs.
+func TestCronJobSuspendUsesCurrentFactory(t *testing.T) {
+	for _, name := range []string{"first", "second"} {
+		t.Run(name, func(t *testing.T) {
+			fc := fakecluster.New(t, fakecluster.WithObjects(simCronJob(name)))
+			s := NewSimApp(t, fc, SimNamespace("ns1"), SimView("cj"))
+			selectPath(t, s, "ns1/"+name)
+			s.Keys(ui.KeyS)
+			s.Eventually(s.DialogOpen, "no suspend confirmation from current factory")
+			confirmOK(t, s)
+			s.Eventually(func() bool { return len(fc.Actions("patch", "cronjobs")) == 1 }, "current factory received no suspend patch")
+			current, err := fc.DynGet(client.CjGVR, "ns1", name)
+			require.NoError(t, err)
+			suspended, _, err := unstructured.NestedBool(current.Object, "spec", "suspend")
+			require.NoError(t, err)
+			assert.True(t, suspended)
+		})
+	}
+}

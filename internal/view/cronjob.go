@@ -124,16 +124,12 @@ func (c *CronJob) toggleSuspendCmd(evt *tcell.EventKey) *tcell.EventKey {
 	if len(selections) == 0 {
 		return evt
 	}
-	res, err := dao.AccessorFor(c.App().factory, c.GVR())
-	if err != nil {
-		c.App().Flash().Err(err)
-		return nil
-	}
-	resource, ok := res.(*dao.CronJob)
-	if !ok {
+	if c.GVR().GVR() != client.CjGVR.GVR() {
 		c.App().Flash().Errf("expecting a cron job for %q", c.GVR())
 		return nil
 	}
+	var resource dao.CronJob
+	resource.Init(c.App().factory, c.GVR())
 	if err := resource.PinClient(); err != nil {
 		c.App().Flash().Err(err)
 		return nil
