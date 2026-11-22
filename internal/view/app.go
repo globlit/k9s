@@ -44,17 +44,19 @@ const (
 type App struct {
 	version string
 	*ui.App
-	Content       *PageStack
-	command       *Command
-	factory       *watch.Factory
-	cancelFn      context.CancelFunc
-	clusterModel  *model.ClusterInfo
-	cmdHistory    *model.History
-	filterHistory *model.History
-	conRetry      int32
-	showHeader    bool
-	showLogo      bool
-	showCrumbs    bool
+	Content         *PageStack
+	command         *Command
+	factory         *watch.Factory
+	cancelFn        context.CancelFunc
+	lifecycleCancel context.CancelFunc
+	lifecycleCtx    context.Context
+	clusterModel    *model.ClusterInfo
+	cmdHistory      *model.History
+	filterHistory   *model.History
+	conRetry        int32
+	showHeader      bool
+	showLogo        bool
+	showCrumbs      bool
 }
 
 // NewApp returns a K9s app instance.
@@ -93,8 +95,9 @@ func (a *App) ConOK() bool {
 // Init initializes the application.
 func (a *App) Init(version string, _ int) error {
 	a.version = model.NormalizeVersion(version)
+	a.lifecycleCtx, a.lifecycleCancel = context.WithCancel(context.Background())
 
-	ctx := context.WithValue(context.Background(), internal.KeyApp, a)
+	ctx := context.WithValue(a.lifecycleCtx, internal.KeyApp, a)
 	if err := a.Content.Init(ctx); err != nil {
 		return err
 	}
@@ -190,7 +193,13 @@ func (a *App) initSignals() {
 	signal.Notify(sig, syscall.SIGHUP, syscall.SIGTERM)
 
 	go func() {
-		s := <-sig
+		defer signal.Stop(sig)
+		var s os.Signal
+		select {
+		case <-a.lifecycleCtx.Done():
+			return
+		case s = <-sig:
+		}
 		slog.Warn("Received signal, shutting down", slogs.Sig, s)
 		done := make(chan struct{})
 		a.QueueUpdate(func() {
@@ -853,4 +862,23 @@ func (a *App) clusterInfo() *ClusterInfo {
 
 func (a *App) statusIndicator() *ui.StatusIndicator {
 	return a.Views()["statusIndicator"].(*ui.StatusIndicator)
+}
+
+// Stop permanently closes the app and its background workers. Cleanup runs on
+// the UI loop before tview stops, so queued updates can finish without blocking.
+func (a *App) Stop() {
+	a.App.Shutdown(func() {
+		a.Halt()
+		if a.lifecycleCancel != nil {
+			a.lifecycleCancel()
+		}
+		for _, component := range a.Content.Peek() {
+			component.Stop()
+		}
+		if a.factory != nil {
+			a.factory.Terminate()
+		}
+		a.Flash().Stop()
+		a.SetRunning(false)
+	})
 }

@@ -14,20 +14,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func runSimApp(t *testing.T) *tview.Application {
+func runSimApp(t testing.TB) (*tview.Application, *dispatcher) {
 	t.Helper()
 	scr := tcell.NewSimulationScreen("UTF-8")
+	require.NoError(t, scr.Init())
 	app := tview.NewApplication().SetScreen(scr)
 	app.SetRoot(tview.NewBox(), true)
-	go func() { _ = app.Run() }()
-	t.Cleanup(app.Stop)
+	d := newDispatcher()
+	done := make(chan error, 1)
+	go func() { done <- app.Run() }()
+	t.Cleanup(func() {
+		d.shutdown(app, func() {})
+		select {
+		case err := <-done:
+			require.NoError(t, err)
+		case <-time.After(5 * time.Second):
+			t.Error("application did not finish shutdown")
+		}
+	})
 
-	return app
+	return app, d
 }
 
 func TestDispatcherKeepsOrderPerProducer(t *testing.T) {
-	app := runSimApp(t)
-	d := newDispatcher()
+	app, d := runSimApp(t)
 
 	const producers, perProducer = 8, 500
 	var (
@@ -61,8 +71,7 @@ func TestDispatcherKeepsOrderPerProducer(t *testing.T) {
 }
 
 func TestDispatcherNestedEnqueue(t *testing.T) {
-	app := runSimApp(t)
-	d := newDispatcher()
+	app, d := runSimApp(t)
 
 	var done sync.WaitGroup
 	done.Add(2)
@@ -90,4 +99,19 @@ func waitOrFail(t *testing.T, wg *sync.WaitGroup) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("updates not applied in time")
 	}
+}
+
+func TestDispatcherShutdownDrainsAndTerminates(t *testing.T) {
+	app, d := runSimApp(t)
+	var order []string
+	d.enqueue(app, uiUpdate{f: func() { order = append(order, "accepted") }})
+	d.shutdown(app, func() { order = append(order, "cleanup") })
+	d.shutdown(app, func() { t.Error("duplicate cleanup") })
+	d.enqueue(app, uiUpdate{f: func() { t.Error("update after shutdown") }})
+	select {
+	case <-d.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("dispatcher did not terminate")
+	}
+	assert.Equal(t, []string{"accepted", "cleanup"}, order)
 }

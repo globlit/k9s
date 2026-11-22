@@ -293,3 +293,9 @@ func AsKey(evt *tcell.EventKey) tcell.Key {
 	}
 	return key
 }
+
+// Shutdown finishes queued UI work, runs cleanup on the event loop, then stops.
+// Calls after shutdown are discarded. Unlike Suspend, shutdown is permanent.
+func (a *App) Shutdown(cleanup func()) {
+	a.dispatch.shutdown(a.Application, cleanup)
+}

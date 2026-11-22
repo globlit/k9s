@@ -24,10 +24,12 @@ type dispatcher struct {
 	pending []uiUpdate
 	wake    chan struct{}
 	once    sync.Once
+	closed  bool
+	done    chan struct{}
 }
 
 func newDispatcher() *dispatcher {
-	return &dispatcher{wake: make(chan struct{}, 1)}
+	return &dispatcher{wake: make(chan struct{}, 1), done: make(chan struct{})}
 }
 
 // enqueue adds an update. Never blocks.
@@ -35,6 +37,10 @@ func (d *dispatcher) enqueue(app *tview.Application, u uiUpdate) {
 	d.once.Do(func() { go d.run(app) })
 
 	d.mx.Lock()
+	if d.closed {
+		d.mx.Unlock()
+		return
+	}
 	d.pending = append(d.pending, u)
 	d.mx.Unlock()
 
@@ -55,6 +61,7 @@ func (d *dispatcher) take() []uiUpdate {
 }
 
 func (d *dispatcher) run(app *tview.Application) {
+	defer close(d.done)
 	for range d.wake {
 		batch := d.take()
 		if len(batch) == 0 {
@@ -74,5 +81,29 @@ func (d *dispatcher) run(app *tview.Application) {
 		} else {
 			app.QueueUpdate(run)
 		}
+		d.mx.Lock()
+		finished := d.closed && len(d.pending) == 0
+		d.mx.Unlock()
+		if finished {
+			return
+		}
+	}
+}
+
+// shutdown orders final cleanup after accepted updates and rejects new work.
+// The event loop must remain running until the final callback stops it.
+func (d *dispatcher) shutdown(app *tview.Application, cleanup func()) {
+	d.mx.Lock()
+	if d.closed {
+		d.mx.Unlock()
+		return
+	}
+	d.closed = true
+	d.pending = append(d.pending, uiUpdate{f: func() { cleanup(); app.Stop() }})
+	d.mx.Unlock()
+	d.once.Do(func() { go d.run(app) })
+	select {
+	case d.wake <- struct{}{}:
+	default:
 	}
 }

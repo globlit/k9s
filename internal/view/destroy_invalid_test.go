@@ -85,34 +85,32 @@ func workloadDeleteSels(t *testing.T, s *SimApp, sels ...string) {
 }
 
 func TestWorkloadDeleteAPIErrors(t *testing.T) {
-	fc := fakecluster.New(t,
-		fakecluster.WithObjects(simPod("ns1", "pod-a"), simPod("ns1", "pod-b")),
-		fakecluster.FailOn("delete", "pods", 0, errInvalid),
-	)
-	s := NewSimApp(t, fc, SimNamespace("ns1"), SimView("wk"))
-	s.Eventually(func() bool { return s.TopView() == "Workload" }, "no workload view")
-
-	t.Run("single", func(t *testing.T) {
-		fc.Reset()
-		workloadDeleteSels(t, s, "v1/pods|ns1|pod-a")
-		s.ConfirmDelete("Background", false)
-		s.Eventually(flashHas(s, "Delete failed with `boom"), "no failure flash")
-		assert.Len(t, fc.Deletes(), 1)
-	})
-	t.Run("marked", func(t *testing.T) {
-		fc.Reset()
-		workloadDeleteSels(t, s, "v1/pods|ns1|pod-a", "bad-path", "v1/pods|ns1|pod-b")
-		s.ConfirmDelete("Foreground", true)
-		s.Eventually(flashHas(s, "delete failed for 3/3"), "no batch flash")
-		assert.Len(t, fc.Deletes(), 2, "a bad path sends no call")
-	})
-	t.Run("single-bad-path", func(t *testing.T) {
-		fc.Reset()
-		workloadDeleteSels(t, s, "v1/pods/ns1/pod-a")
-		s.ConfirmDelete("Background", false)
-		s.Eventually(flashHas(s, "unable to parse path"), "no parse flash")
-		assert.Empty(t, fc.Deletes())
-	})
+	for name, tc := range map[string]struct {
+		paths       []string
+		propagation string
+		force       bool
+		message     string
+		deletes     int
+	}{
+		"single":          {[]string{"v1/pods|ns1|pod-a"}, "Background", false, "Delete failed with `boom", 1},
+		"marked":          {[]string{"v1/pods|ns1|pod-a", "bad-path", "v1/pods|ns1|pod-b"}, "Foreground", true, "delete failed for 3/3", 2},
+		"single-bad-path": {[]string{"v1/pods/ns1/pod-a"}, "Background", false, "unable to parse path", 0},
+	} {
+		t.Run(name, func(t *testing.T) {
+			fc := fakecluster.New(t,
+				fakecluster.WithAPIServer(),
+				fakecluster.WithObjects(simPod("ns1", "pod-a"), simPod("ns1", "pod-b")),
+				fakecluster.FailOn("delete", "pods", 0, errInvalid),
+			)
+			s := NewSimApp(t, fc, SimNamespace("ns1"), SimView("wk"))
+			s.Eventually(func() bool { return s.TopView() == "Workload" }, "no workload view")
+			fc.Reset()
+			workloadDeleteSels(t, s, tc.paths...)
+			s.ConfirmDelete(tc.propagation, tc.force)
+			s.Eventually(flashHas(s, tc.message), "no failure flash")
+			assert.Len(t, fc.Deletes(), tc.deletes, "a bad path sends no call")
+		})
+	}
 }
 
 func TestWorkloadDeleteEmpty(t *testing.T) {

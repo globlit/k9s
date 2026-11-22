@@ -160,3 +160,11 @@ func (f *Flash) fireFlashChanged() {
 func (f *Flash) fireCleared() {
 	f.msgChan <- newClearMessage()
 }
+
+// Stop cancels the pending flash timer. Call from the UI event loop.
+func (f *Flash) Stop() {
+	if f.cancel != nil {
+		f.cancel()
+		f.cancel = nil
+	}
+}
