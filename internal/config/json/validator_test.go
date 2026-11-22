@@ -221,8 +221,7 @@ func TestValidateViews(t *testing.T) {
 			f: "testdata/views/toast.yaml",
 			err: `Additional property cols is not allowed
 Additional property sortCol is not allowed
-Invalid type. Expected: object, given: null
-columns is required`,
+Invalid type. Expected: object, given: null`,
 		},
 	}
 

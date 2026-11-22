@@ -153,6 +153,7 @@ func TestK9sMerge(t *testing.T) {
 				DisablePodCounting:  false,
 				ShellPod:            config.NewShellPod(),
 				ImageScans:          config.ImageScans{},
+				DebugContainer:      config.NewDebugContainer(),
 				Logger:              config.Logger{},
 				Thresholds:          nil,
 			},
