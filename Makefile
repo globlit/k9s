@@ -14,9 +14,10 @@ BUILD_PLATFORMS ?= linux/amd64,linux/arm64
 
 TEST_P          ?= 2
 GOMAXPROCS      ?= 4
-FUZZTIME        ?= 30s
+FUZZTIME        ?= 60s
 BENCH_OUT       ?= bench.txt
 BENCH_BASE      ?= bench-base.txt
+BENCHSTAT       := go run golang.org/x/perf/cmd/benchstat@v0.0.0-20261117185222-4febdb082b2c
 E2E_CLUSTER     := k9s-e2e
 E2E_DIR         ?= $(or $(TMPDIR),/tmp)/k9s-e2e
 E2E_RUN         ?=
@@ -40,15 +41,17 @@ test-race:               ## Run all tests with the race detector
 fuzz-seed:               ## Run fuzz targets on their seed corpus only
 	@$(TEST_ENV) go test -count=1 -p $(TEST_P) -run '^Fuzz' ./...
 
-fuzz:                    ## Fuzz each target in turn for FUZZTIME (default 30s)
+fuzz:                    ## Fuzz each target in turn for FUZZTIME (default 60s)
 	@FUZZTIME=$(FUZZTIME) $(TEST_ENV) hack/fuzz.sh
 
 bench:                   ## Run benchmarks into BENCH_OUT
-	@$(TEST_ENV) go test -run '^$$' -bench . -benchmem -count 6 -p 1 ./... | tee $(BENCH_OUT)
+	@$(TEST_ENV) go test -run '^$$' -bench . -benchmem -count 10 -p 1 ./... > $(BENCH_OUT)
+	@cat $(BENCH_OUT)
 
 bench-compare:           ## Compare BENCH_BASE with BENCH_OUT using benchstat
-	@command -v benchstat >/dev/null 2>&1 || go install golang.org/x/perf/cmd/benchstat@latest
-	@benchstat $(BENCH_BASE) $(BENCH_OUT)
+	@$(BENCHSTAT) $(BENCH_BASE) $(BENCH_OUT)
+	@$(BENCHSTAT) -format csv $(BENCH_BASE) $(BENCH_OUT) > benchstat.csv
+	@python3 hack/benchcheck.py benchstat.csv
 
 .PHONY: e2e e2e-kind-up e2e-kind-down
 
@@ -66,7 +69,7 @@ e2e-kind-down:           ## Delete the kind cluster k9s-e2e only
 
 e2e:                     ## Build k9s into E2E_DIR and run the kind e2e tests
 	@mkdir -p $(E2E_DIR)
-	@CGO_ENABLED=0 go build -o $(E2E_DIR)/k9s main.go
+	@CGO_ENABLED=0 $(TEST_ENV) go build -p $(TEST_P) -o $(E2E_DIR)/k9s main.go
 	@K9S_E2E_BIN=$(E2E_DIR)/k9s $(TEST_ENV) go test -count=1 -tags e2e -p 1 -timeout 30m \
 		$(if $(E2E_RUN),-run '$(E2E_RUN)') ./e2e/...
 
@@ -94,3 +97,21 @@ pushx:                   ## Push Docker image to registry, tagged with both VERS
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":[^:]*?## "}; {printf "\033[38;5;69m%-30s\033[38;5;38m %s\033[0m\n", $$1, $$2}'
+
+.PHONY: test-resource test-harness validate
+
+test-resource:           ## Run isolated Linux lifecycle resource checks
+	@K9S_RESOURCE_TEST=1 $(TEST_ENV) go test -p 1 -count=1 -timeout 10m -run '^TestResource' -v ./internal/view
+
+test-harness:            ## Validate benchmark and fuzz gate behavior
+	@python3 -m unittest discover -s hack -p 'test_*.py'
+
+validate:                ## Run every gate; requires isolated E2E cluster and BENCH_BASE
+	@$(MAKE) test-harness
+	@$(MAKE) test
+	@$(MAKE) test-race
+	@$(MAKE) fuzz
+	@$(MAKE) test-resource
+	@$(MAKE) e2e
+	@$(MAKE) bench
+	@$(MAKE) bench-compare

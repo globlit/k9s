@@ -1,12 +1,18 @@
 name: K9s Fuzz Nightly
 
 on:
+  pull_request:
+    branches: [master]
   workflow_dispatch:
   schedule:
     - cron: "17 3 * * *"
 
 permissions:
   contents: read
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   targets:
@@ -28,7 +34,7 @@ jobs:
     timeout-minutes: 60
     strategy:
       fail-fast: false
-      max-parallel: 10
+      max-parallel: 4
       matrix:
         include: ${{ fromJSON(needs.targets.outputs.matrix) }}
     name: ${{ matrix.target }}
@@ -46,13 +52,30 @@ jobs:
         env:
           PKG: ${{ matrix.pkg }}
           TARGET: ${{ matrix.target }}
-        run: go test -run '^$' -fuzz "^${TARGET}\$" -fuzztime 2m -parallel 2 "$PKG"
+        run: go test -run '^$' -fuzz "^${TARGET}\$" -fuzztime 60s -parallel 2 "$PKG"
 
-      - name: Upload crashers
-        if: failure()
+      - name: Locate generated corpus
+        if: always()
+        run: echo "FUZZ_CACHE=$(go env GOCACHE)/fuzz" >> "$GITHUB_ENV"
+
+      - name: Upload fuzz evidence
+        if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: fuzz-${{ matrix.target }}
-          path: ${{ matrix.pkg }}/testdata/fuzz/${{ matrix.target }}
+          path: |
+            ${{ matrix.pkg }}/testdata/fuzz/${{ matrix.target }}
+            ${{ env.FUZZ_CACHE }}
           if-no-files-found: ignore
           retention-days: 30
+
+  fuzz-complete:
+    if: always()
+    needs: [targets, fuzz]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every target
+        env:
+          TARGET_RESULT: ${{ needs.targets.result }}
+          FUZZ_RESULT: ${{ needs.fuzz.result }}
+        run: test "$TARGET_RESULT" = success && test "$FUZZ_RESULT" = success

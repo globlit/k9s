@@ -11,7 +11,11 @@ permissions:
 
 env:
   BENCHSTAT: golang.org/x/perf/cmd/benchstat@v0.0.0-20261117185222-4febdb082b2c
-  BENCH_ARGS: -count 6 -run ^$ -bench . -benchmem -p 1 ./internal/...
+  BENCH_ARGS: -count 10 -run ^$ -bench . -benchmem -p 1 ./internal/...
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   bench:
@@ -42,7 +46,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || 'origin/master' }}
         run: |
           git checkout --detach "$BASE_SHA"
-          go test $BENCH_ARGS | tee "$RUNNER_TEMP/base.txt" || echo "::warning::base benchmarks failed"
+          go test $BENCH_ARGS | tee "$RUNNER_TEMP/base.txt"
 
       - name: Compare
         working-directory: ${{ runner.temp }}
@@ -50,7 +54,7 @@ jobs:
           benchstat base.txt head.txt > benchstat.txt
           benchstat -format csv base.txt head.txt > benchstat.csv
           set +e
-          python3 benchcheck.py benchstat.csv 10 > report.md
+          python3 benchcheck.py benchstat.csv > report.md
           rc=$?
           set -e
           cat report.md
@@ -64,3 +68,13 @@ jobs:
             echo '</details>'
           } >> "$GITHUB_STEP_SUMMARY"
           exit "$rc"
+
+      - name: Upload benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: benchmarks
+          path: |
+            ${{ runner.temp }}/*.txt
+            ${{ runner.temp }}/benchstat.csv
+            ${{ runner.temp }}/report.md

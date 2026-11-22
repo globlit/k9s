@@ -11,6 +11,10 @@ on:
   pull_request:
     branches:
       - master
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -28,10 +32,21 @@ jobs:
       - name: Setup GO env
         run: go env -w CGO_ENABLED=0
 
+      - name: Test harness gates
+        run: make test-harness
+
       - name: Run Tests
-        run: make test
+        run: GOMAXPROCS=4 go test -count=1 -p 2 -timeout 10m -coverprofile=coverage.out ./...
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: coverage
+          path: coverage.out
+          if-no-files-found: error
 
   cross:
     runs-on: ubuntu-latest
@@ -75,3 +90,19 @@ jobs:
 
       - name: Run Tests With Race Detector
         run: make test-race
+
+  resources:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+      - name: Check retained resources
+        run: make test-resource | tee resources.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: resources
+          path: resources.txt
