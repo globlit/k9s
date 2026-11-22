@@ -309,22 +309,26 @@ func loadRBAC(m ResourceMetas) {
 		Name:       "rbacs",
 		Kind:       "Rules",
 		Categories: []string{k9sCat},
+		Verbs:      []string{},
 	}
 	m[client.PolGVR] = &metav1.APIResource{
 		Name:       "policies",
 		Kind:       "Rules",
 		Namespaced: true,
 		Categories: []string{k9sCat},
+		Verbs:      []string{},
 	}
 	m[client.UsrGVR] = &metav1.APIResource{
 		Name:       "users",
 		Kind:       "User",
 		Categories: []string{k9sCat},
+		Verbs:      []string{},
 	}
 	m[client.GrpGVR] = &metav1.APIResource{
 		Name:       "groups",
 		Kind:       "Group",
 		Categories: []string{k9sCat},
+		Verbs:      []string{},
 	}
 }
 

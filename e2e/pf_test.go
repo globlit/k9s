@@ -57,4 +57,23 @@ func TestPortForward(t *testing.T) {
 	if strings.TrimSpace(body) != "netexec" {
 		t.Fatalf("hostname is %q, want netexec", body)
 	}
+
+	// Namespace navigation uses local rows and preserves the live tunnel.
+	h.Cmd("pf", "portforwards(")
+	h.SendKeys("0")
+	h.WaitFor("portforwards(all)", 10*time.Second)
+	h.Filter("netexec")
+	h.WaitFor(" netexec ", 10*time.Second)
+	h.SendKeys("w")
+	h.WaitFor("portforwards("+h.NS+")", 10*time.Second)
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		t.Fatalf("forwarder unavailable after namespace warp: %v", err)
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil || resp.StatusCode != http.StatusOK || strings.TrimSpace(string(data)) != "netexec" {
+		t.Fatalf("forwarder changed after namespace warp: status=%d body=%q err=%v", resp.StatusCode, data, err)
+	}
 }

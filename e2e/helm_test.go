@@ -28,6 +28,12 @@ func TestHelmRollbackUninstall(t *testing.T) {
 
 	h.Start("-c", "helm")
 	h.WaitFor("helm("+h.NS+")", 30*time.Second)
+	h.SendKeys("0")
+	h.WaitFor("helm(all)", 10*time.Second)
+	h.Filter("demo")
+	h.WaitFor(" demo ", 10*time.Second)
+	h.SendKeys("w")
+	h.WaitFor("helm("+h.NS+")", 10*time.Second)
 	h.Filter("demo")
 	h.WaitFor(" demo ", 10*time.Second)
 	h.SendKeys("Enter")

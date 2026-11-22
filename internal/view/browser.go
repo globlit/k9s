@@ -397,6 +397,12 @@ func (b *Browser) nsWarpCmd(*tcell.EventKey) *tcell.EventKey {
 	if path == "" {
 		return nil
 	}
+	// Local views have no informer: read the namespace from the path.
+	if !dao.IsK8sMeta(b.meta) {
+		ns, _ := client.Namespaced(path)
+		b.App().gotoResource(b.GVR().String()+" "+ns, "", true, true)
+		return nil
+	}
 
 	o, err := b.app.factory.Get(b.GVR(), path, true, nil)
 	if err != nil {
@@ -600,7 +606,11 @@ func (b *Browser) switchNamespaceCmd(evt *tcell.EventKey) *tcell.EventKey {
 	}
 	ns := b.namespaces[i]
 
-	auth, err := b.App().factory.Client().CanI(ns, b.GVR(), "", client.ListAccess)
+	// Synthetic resource names have no API authorization endpoint.
+	auth, err := true, error(nil)
+	if dao.IsK8sMeta(b.meta) {
+		auth, err = b.App().factory.Client().CanI(ns, b.GVR(), "", client.ListAccess)
+	}
 	if !auth {
 		if err == nil {
 			err = fmt.Errorf("access denied for user on: %s/%s", ns, b.GVR())

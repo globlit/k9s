@@ -48,6 +48,7 @@ func TestMetaFor(t *testing.T) {
 				Kind:       "Rules",
 				Namespaced: true,
 				Categories: []string{k9sCat},
+				Verbs:      []string{},
 			},
 		},
 
@@ -190,4 +191,16 @@ func TestCRDSummary(t *testing.T) {
 	m := ResourceMetas{client.NewGVR("fred.com/v1/blees"): &metav1.APIResource{Name: "blees"}}
 	addCRDProperties(m, &crd)
 	assert.Contains(t, m[client.NewGVR("fred.com/v1/blees")].Categories, scaleCat)
+}
+
+func TestVirtualRBACCapabilities(t *testing.T) {
+	m := NewMeta()
+	require.NoError(t, m.LoadResources(nil))
+	for _, gvr := range []*client.GVR{client.RbacGVR, client.PolGVR, client.UsrGVR, client.GrpGVR} {
+		meta, err := m.MetaFor(gvr)
+		require.NoError(t, err)
+		assert.False(t, client.Can(meta.Verbs, "edit"), gvr.String())
+		assert.False(t, client.Can(meta.Verbs, "delete"), gvr.String())
+	}
+	assert.True(t, client.Can(nil, "edit"), "unspecified capabilities retain their existing convention")
 }
