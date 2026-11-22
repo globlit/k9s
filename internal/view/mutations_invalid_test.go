@@ -522,6 +522,11 @@ func TestSimpleDeleteInvalid(t *testing.T) {
 	s := NewSimApp(t, fc, SimNamespace("ns1"))
 	dir := s.app.Config.K9s.ContextScreenDumpDir()
 	require.NoError(t, os.MkdirAll(dir, 0o700))
+	ee, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	for _, e := range ee {
+		require.NoError(t, os.Remove(filepath.Join(dir, e.Name())))
+	}
 
 	t.Run("empty", func(t *testing.T) {
 		s.Cmd(":sd")
