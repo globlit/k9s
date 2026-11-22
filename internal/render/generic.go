@@ -47,12 +47,16 @@ func (m Generic) Render(o any, _ string, row *model1.Row) error {
 }
 
 // defaultRow populates the row fields with Deployment data.
-func (Generic) defaultRow(raw *unstructured.Unstructured, r *model1.Row) error {
+func (m Generic) defaultRow(raw *unstructured.Unstructured, r *model1.Row) error {
+	valid := ""
+	if m.vs.ReadinessEnabled() {
+		valid, _ = readyFromConditions(raw.Object)
+	}
 	r.ID = client.FQN(raw.GetNamespace(), raw.GetName())
 	r.Fields = model1.Fields{
 		raw.GetNamespace(),
 		raw.GetName(),
-		"",
+		valid,
 		ToAge(raw.GetCreationTimestamp()),
 	}
 	stashAge(r, raw.GetCreationTimestamp())

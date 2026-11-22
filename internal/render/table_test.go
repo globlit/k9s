@@ -83,10 +83,10 @@ func TestGenericRender(t *testing.T) {
 			var r model1.Row
 			re.SetTable(u.ns, u.table)
 
-			assert.Equal(t, u.eHeader, re.Header(u.ns))
+			assert.Equal(t, append(u.eHeader, model1.HeaderColumn{Name: "VALID", Attrs: model1.Attrs{Wide: true}}), re.Header(u.ns))
 			require.NoError(t, re.Render(u.table.Rows[0], u.ns, &r))
 			assert.Equal(t, u.eID, r.ID)
-			assert.Equal(t, u.eFields, r.Fields)
+			assert.Equal(t, append(u.eFields, ""), r.Fields)
 		})
 	}
 }
@@ -130,10 +130,10 @@ func TestGenericCustRender(t *testing.T) {
 			var r model1.Row
 			re.SetTable(u.ns, u.table)
 
-			assert.Equal(t, u.eHeader, re.Header(u.ns))
+			assert.Equal(t, append(u.eHeader, model1.HeaderColumn{Name: "VALID", Attrs: model1.Attrs{Wide: true}}), re.Header(u.ns))
 			require.NoError(t, re.Render(u.table.Rows[0], u.ns, &r))
 			assert.Equal(t, u.eID, r.ID)
-			assert.Equal(t, u.eFields, r.Fields)
+			assert.Equal(t, append(u.eFields, ""), r.Fields)
 		})
 	}
 }

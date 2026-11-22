@@ -11,12 +11,12 @@
         "additionalProperties": false,
         "properties": {
           "sortColumn": { "type": "string" },
+          "readiness": { "type": "boolean" },
           "columns": {
             "type": "array",
             "items": { "type": "string" }
           }
-        },
-        "required": ["columns"]
+        }
       }
     }
   },

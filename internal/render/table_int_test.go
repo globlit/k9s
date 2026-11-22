@@ -94,7 +94,7 @@ func Test_defaultHeader(t *testing.T) {
 		t.Run(k, func(t *testing.T) {
 			var ta Table
 			ta.SetTable("ns-1", &metav1.Table{ColumnDefinitions: u.cdefs})
-			assert.Equal(t, u.e, ta.defaultHeader())
+			assert.Equal(t, append(u.e, model1.HeaderColumn{Name: colValid, Attrs: model1.Attrs{Wide: true}}), ta.defaultHeader())
 		})
 	}
 }

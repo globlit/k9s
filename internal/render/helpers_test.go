@@ -44,7 +44,7 @@ func TestTableGenericHydrate(t *testing.T) {
 
 	require.NoError(t, model1.GenericHydrate("blee", &tt, rr, &re))
 	assert.Len(t, rr, 2)
-	assert.Len(t, rr[0].Fields, 2)
+	assert.Len(t, rr[0].Fields, 3)
 }
 
 func TestTableHydrate(t *testing.T) {

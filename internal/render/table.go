@@ -14,6 +14,7 @@ import (
 	"github.com/globlit/k9s/internal/model1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -24,10 +25,10 @@ var ageCols = sets.New("last seen", "first seen", "age")
 // Table renders a tabular resource to screen.
 type Table struct {
 	Base
-	table    *metav1.Table
-	header   model1.Header
-	ageIndex int
-	mx       sync.RWMutex
+	table         *metav1.Table
+	printerHeader model1.Header
+	ageIndex      int
+	mx            sync.RWMutex
 }
 
 func (*Table) IsGeneric() bool {
@@ -47,9 +48,16 @@ func (t *Table) getAgeIndex() int {
 }
 
 // SetTable sets the tabular resource.
-func (t *Table) SetTable(ns string, table *metav1.Table) {
+func (t *Table) SetTable(_ string, table *metav1.Table) {
 	t.table = table
-	t.header = t.Header(ns)
+	t.setAgeIndex(-1)
+	t.printerHeader = make(model1.Header, len(table.ColumnDefinitions))
+	for i, c := range table.ColumnDefinitions {
+		t.printerHeader[i].Name = strings.ToUpper(c.Name)
+		if strings.EqualFold(c.Name, ageTableCol) {
+			t.setAgeIndex(i)
+		}
+	}
 }
 
 // ColorerFunc colors a resource row.
@@ -68,18 +76,20 @@ func (t *Table) defaultHeader() model1.Header {
 		return model1.Header{}
 	}
 	h := make(model1.Header, 0, len(t.table.ColumnDefinitions))
-	for i, c := range t.table.ColumnDefinitions {
+	for _, c := range t.table.ColumnDefinitions {
 		if strings.EqualFold(c.Name, ageTableCol) {
-			t.setAgeIndex(i)
 			continue
 		}
 		timeCol := ageCols.Has(strings.ToLower(c.Name))
 		h = append(h, model1.HeaderColumn{Name: strings.ToUpper(c.Name), Attrs: model1.Attrs{Time: timeCol, Wide: c.Priority > 0}})
 	}
-	if t.getAgeIndex() > 0 {
+	if t.getAgeIndex() >= 0 {
 		h = append(h, model1.HeaderColumn{Name: colAge, Attrs: model1.Attrs{Time: true}})
 	}
 
+	if _, ok := h.IndexOf(colValid, true); !ok {
+		h = append(h, model1.HeaderColumn{Name: colValid, Attrs: model1.Attrs{Wide: true}})
+	}
 	return h
 }
 
@@ -104,7 +114,7 @@ func (t *Table) Render(o any, ns string, r *model1.Row) error {
 }
 
 func (t *Table) defaultRow(row *metav1.TableRow, ns string, r *model1.Row) error {
-	th := t.header
+	th := t.printerHeader
 	ons, name := ns, UnknownValue
 	var creationTs metav1.Time
 	switch {
@@ -140,7 +150,7 @@ func (t *Table) defaultRow(row *metav1.TableRow, ns string, r *model1.Row) error
 		ageIdx = t.getAgeIndex()
 	)
 	for i, c := range row.Cells {
-		if ageIdx > 0 && i == ageIdx {
+		if ageIdx >= 0 && i == ageIdx {
 			age = c
 			continue
 		}
@@ -152,9 +162,25 @@ func (t *Table) defaultRow(row *metav1.TableRow, ns string, r *model1.Row) error
 	}
 	if d, ok := age.(string); ok {
 		r.Fields = append(r.Fields, d)
-	} else if ageIdx > 0 {
+	} else if ageIdx >= 0 {
 		slog.Warn("No Duration detected on age field")
 		r.Fields = append(r.Fields, NAValue)
+	}
+
+	// Printer cells retain their server order, independent of custom columns.
+	h := t.printerHeader
+	if _, exists := h.IndexOf(colValid, true); !exists {
+		valid := ""
+		if t.vs.ReadinessEnabled() {
+			known := false
+			if obj, ok := row.Object.Object.(*unstructured.Unstructured); ok {
+				valid, known = readyFromConditions(obj.Object)
+			}
+			if !known {
+				valid = readyFromCells(h, row.Cells)
+			}
+		}
+		r.Fields = append(r.Fields, valid)
 	}
 
 	return nil

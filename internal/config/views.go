@@ -35,6 +35,12 @@ type ViewConfigListener interface {
 type ViewSetting struct {
 	Columns    []string `yaml:"columns"`
 	SortColumn string   `yaml:"sortColumn"`
+	Readiness  *bool    `yaml:"readiness,omitempty"`
+}
+
+// ReadinessEnabled reports whether generic readiness diagnostics are enabled.
+func (v *ViewSetting) ReadinessEnabled() bool {
+	return v == nil || v.Readiness == nil || *v.Readiness
 }
 
 func (v *ViewSetting) HasCols() bool {
@@ -42,7 +48,7 @@ func (v *ViewSetting) HasCols() bool {
 }
 
 func (v *ViewSetting) IsBlank() bool {
-	return v == nil || (len(v.Columns) == 0 && v.SortColumn == "")
+	return v == nil || (len(v.Columns) == 0 && v.SortColumn == "" && v.Readiness == nil)
 }
 
 func (v *ViewSetting) SortCol() (name string, asc bool, err error) {
@@ -70,7 +76,7 @@ func (v *ViewSetting) Equals(vs *ViewSetting) bool {
 		return false
 	}
 
-	return cmp.Compare(v.SortColumn, vs.SortColumn) == 0
+	return cmp.Compare(v.SortColumn, vs.SortColumn) == 0 && v.ReadinessEnabled() == vs.ReadinessEnabled()
 }
 
 // CustomView represents a collection of view customization.
