@@ -71,10 +71,11 @@ type diffContent struct{ subject, values, manifest string }
 func openDiff(source ResourceViewer, load func(context.Context) (diffContent, error)) {
 	app := source.App()
 	contextName := app.Config.ActiveContextName()
+	timeout := app.Conn().Config().CallTimeout()
 	app.Flash().Info("Loading diff...")
 	go func() {
 		defer internal.LogPanic("load diff")
-		ctx, cancel := context.WithTimeout(context.Background(), app.Conn().Config().CallTimeout())
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		content, err := load(ctx)
 		app.QueueUpdateDraw(func() {

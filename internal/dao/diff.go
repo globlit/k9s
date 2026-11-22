@@ -13,12 +13,13 @@ import (
 
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/config/data"
-	"github.com/globlit/k9s/internal/render/helm"
 	"github.com/pmezard/go-difflib/difflib"
 	"helm.sh/helm/v3/pkg/action"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/yaml"
 )
 
@@ -45,18 +46,14 @@ func templateYAML(template *corev1.PodTemplateSpec) ([]byte, error) {
 	return yaml.Marshal(normalized)
 }
 
-// Diff compares two ReplicaSets, or one selected ReplicaSet with its Deployment's
+// DiffReplicaSets compares two ReplicaSets, or one selection with its Deployment's
 // current template. A single selection is resolved within its namespace and owner UID.
-func (r *ReplicaSet) Diff(ctx context.Context, paths []string) (string, string, error) {
+func DiffReplicaSets(ctx context.Context, dial kubernetes.Interface, paths []string) (string, string, error) {
 	if len(paths) < 1 || len(paths) > 2 {
 		return "", "", fmt.Errorf("select one or two ReplicaSets to diff")
 	}
 	paths = slices.Clone(paths)
 	slices.Sort(paths)
-	dial, err := r.Client().Dial()
-	if err != nil {
-		return "", "", err
-	}
 	namespace, name := client.Namespaced(paths[0])
 	before, err := dial.AppsV1().ReplicaSets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
@@ -152,31 +149,24 @@ func currentReplicaSet(deployment *appsv1.Deployment, candidates []*appsv1.Repli
 // HelmDiff holds both comparisons so the view can toggle without more API reads.
 type HelmDiff struct{ Values, Manifest, Subject string }
 
-// Diff compares selected Helm revisions; one selection uses the previous stored revision.
-func (h *HelmHistory) Diff(ctx context.Context, paths []string) (HelmDiff, error) {
+// DiffHelmRevisions compares revisions using the flags captured when the action starts.
+// One selection uses the previous stored revision.
+func DiffHelmRevisions(ctx context.Context, flags *genericclioptions.ConfigFlags, paths []string) (HelmDiff, error) {
 	var result HelmDiff
 	if len(paths) < 1 || len(paths) > 2 {
 		return result, fmt.Errorf("select one or two Helm revisions to diff")
 	}
-	from, err := h.Get(ctx, paths[0])
+	first, err := getHelmRevision(ctx, flags, paths[0])
 	if err != nil {
 		return result, err
 	}
-	first, ok := from.(helm.ReleaseRes)
-	if !ok {
-		return result, fmt.Errorf("expected Helm release, got %T", from)
-	}
-	before, after := first.Release, first.Release
+	before, after := first, first
 	if len(paths) == 2 {
-		other, err := h.Get(ctx, paths[1])
+		second, err := getHelmRevision(ctx, flags, paths[1])
 		if err != nil {
 			return result, err
 		}
-		second, ok := other.(helm.ReleaseRes)
-		if !ok {
-			return result, fmt.Errorf("expected Helm release, got %T", other)
-		}
-		after = second.Release
+		after = second
 		if before.Name != after.Name || before.Namespace != after.Namespace {
 			return result, fmt.Errorf("select revisions of the same Helm release")
 		}
@@ -185,7 +175,7 @@ func (h *HelmHistory) Diff(ctx context.Context, paths []string) (HelmDiff, error
 		}
 	} else {
 		// History may have gaps after pruning, so revision-1 is not necessarily stored.
-		cfg, err := helmConfigFor(h.Client().Config().Flags(), after.Namespace)
+		cfg, err := helmConfigFor(flags, after.Namespace)
 		if err != nil {
 			return result, err
 		}

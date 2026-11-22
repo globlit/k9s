@@ -140,10 +140,9 @@ func (h *History) diffCmd(evt *tcell.EventKey) *tcell.EventKey {
 	if len(paths) == 0 {
 		return evt
 	}
+	flags := h.App().Conn().Config().Flags()
 	openDiff(h, func(ctx context.Context) (diffContent, error) {
-		var history dao.HelmHistory
-		history.Init(h.App().factory, h.GVR())
-		result, err := history.Diff(ctx, paths)
+		result, err := dao.DiffHelmRevisions(ctx, flags, paths)
 		return diffContent{subject: result.Subject, values: result.Values, manifest: result.Manifest}, err
 	})
 	return nil

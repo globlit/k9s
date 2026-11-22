@@ -90,10 +90,13 @@ func (r *ReplicaSet) diffCmd(evt *tcell.EventKey) *tcell.EventKey {
 	if len(paths) == 0 {
 		return evt
 	}
+	dial, err := r.App().Conn().Dial()
+	if err != nil {
+		r.App().Flash().Err(err)
+		return nil
+	}
 	openDiff(r, func(ctx context.Context) (diffContent, error) {
-		var resource dao.ReplicaSet
-		resource.Init(r.App().factory, r.GVR())
-		text, subject, err := resource.Diff(ctx, paths)
+		text, subject, err := dao.DiffReplicaSets(ctx, dial, paths)
 		return diffContent{subject: subject, values: text}, err
 	})
 	return nil

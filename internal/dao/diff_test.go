@@ -8,14 +8,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/testutil/fakecluster"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"helm.sh/helm/v3/pkg/action"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
 func diffTemplate(image string) corev1.PodTemplateSpec {
@@ -73,21 +74,21 @@ func TestReplicaSetDiff(t *testing.T) {
 	old, current := diffReplica("old", "nginx:1", "1"), diffReplica("current", "nginx:2", "2")
 	deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "web", Namespace: "ns1", UID: "owner"}, Spec: appsv1.DeploymentSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "web"}}, Template: diffTemplate("nginx:2")}}
 	fc := fakecluster.New(t, fakecluster.WithObjects(deployment, old, current))
-	var resource ReplicaSet
-	resource.Init(newFakeFactory(t, fc), client.RsGVR)
-	text, subject, err := resource.Diff(context.Background(), []string{"ns1/old"})
+	dial, err := fc.Conn().Dial()
+	require.NoError(t, err)
+	text, subject, err := DiffReplicaSets(context.Background(), dial, []string{"ns1/old"})
 	require.NoError(t, err)
 	assert.Equal(t, "ns1/old → ns1/current", subject)
 	assert.Contains(t, text, "-  - image: nginx:1")
-	text, subject, err = resource.Diff(context.Background(), []string{"ns1/current", "ns1/old"})
+	text, subject, err = DiffReplicaSets(context.Background(), dial, []string{"ns1/current", "ns1/old"})
 	require.NoError(t, err)
 	assert.Equal(t, "ns1/old → ns1/current", subject)
 	assert.Contains(t, text, "+  - image: nginx:2")
-	_, _, err = resource.Diff(context.Background(), []string{"ns1/current"})
+	_, _, err = DiffReplicaSets(context.Background(), dial, []string{"ns1/current"})
 	require.ErrorContains(t, err, "is current")
-	_, _, err = resource.Diff(context.Background(), []string{"ns1/missing"})
+	_, _, err = DiffReplicaSets(context.Background(), dial, []string{"ns1/missing"})
 	require.Error(t, err)
-	_, _, err = resource.Diff(context.Background(), []string{"a", "b", "c"})
+	_, _, err = DiffReplicaSets(context.Background(), dial, []string{"a", "b", "c"})
 	require.Error(t, err)
 }
 
@@ -99,24 +100,45 @@ func TestHelmRevisionDiff(t *testing.T) {
 		r.Manifest = "message: " + r.Config["message"].(string) + "\n"
 		require.NoError(t, fake.Cfg.Releases.Update(r))
 	}
-	var history HelmHistory
-	history.Init(f, client.NewGVR("helm-history"))
-	result, err := history.Diff(context.Background(), []string{"ns1/demo:3"})
+	flags := f.Client().Config().Flags()
+	result, err := DiffHelmRevisions(context.Background(), flags, []string{"ns1/demo:3"})
 	require.NoError(t, err)
 	assert.Equal(t, "ns1/demo:2 → ns1/demo:3", result.Subject)
 	assert.Contains(t, result.Values, "-message: two\n+message: three")
 	assert.Contains(t, result.Manifest, "-message: two\n+message: three")
-	result, err = history.Diff(context.Background(), []string{"ns1/demo:3", "ns1/demo:1"})
+	result, err = DiffHelmRevisions(context.Background(), flags, []string{"ns1/demo:3", "ns1/demo:1"})
 	require.NoError(t, err)
 	assert.Equal(t, "ns1/demo:1 → ns1/demo:3", result.Subject)
-	_, err = history.Diff(context.Background(), []string{"ns1/demo:1"})
+	_, err = DiffHelmRevisions(context.Background(), flags, []string{"ns1/demo:1"})
 	require.ErrorContains(t, err, "no previous stored revision")
 	_, err = fake.Cfg.Releases.Delete("demo", 2)
 	require.NoError(t, err)
-	result, err = history.Diff(context.Background(), []string{"ns1/demo:3"})
+	result, err = DiffHelmRevisions(context.Background(), flags, []string{"ns1/demo:3"})
 	require.NoError(t, err)
 	assert.Equal(t, "ns1/demo:1 → ns1/demo:3", result.Subject)
 	fake.Seed(t, "other", "ns1", 1)
-	_, err = history.Diff(context.Background(), []string{"ns1/demo:3", "ns1/other:1"})
+	_, err = DiffHelmRevisions(context.Background(), flags, []string{"ns1/demo:3", "ns1/other:1"})
 	require.ErrorContains(t, err, "same Helm release")
+}
+
+func TestHelmDiffUsesCapturedContext(t *testing.T) {
+	fake, _ := useHelmFake(t)
+	fake.Seed(t, "demo", "ns1", 2)
+	cluster := fakecluster.New(t, fakecluster.WithContext("next"), fakecluster.WithContext("initial"))
+	configuration := cluster.Conn().Config()
+	captured := configuration.Flags()
+	require.NoError(t, configuration.SwitchContext("next"))
+	require.NotSame(t, captured, configuration.Flags())
+	require.Equal(t, "initial", *captured.Context)
+
+	var contexts []string
+	original := helmConfigFor
+	helmConfigFor = func(flags *genericclioptions.ConfigFlags, namespace string) (*action.Configuration, error) {
+		contexts = append(contexts, *flags.Context)
+		return original(flags, namespace)
+	}
+	result, err := DiffHelmRevisions(context.Background(), captured, []string{"ns1/demo:2"})
+	require.NoError(t, err)
+	assert.Equal(t, "ns1/demo:1 → ns1/demo:2", result.Subject)
+	assert.Equal(t, []string{"initial", "initial"}, contexts, "Get and History must use the captured context")
 }

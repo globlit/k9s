@@ -15,8 +15,10 @@ import (
 	"github.com/globlit/k9s/internal/config/data"
 	"github.com/globlit/k9s/internal/render/helm"
 	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/release"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
 var (
@@ -59,6 +61,15 @@ func (h *HelmHistory) List(ctx context.Context, _ string) ([]runtime.Object, err
 
 // Get returns a resource.
 func (h *HelmHistory) Get(ctx context.Context, path string) (runtime.Object, error) {
+	rel, err := getHelmRevision(ctx, h.Client().Config().Flags(), path)
+	if err != nil {
+		return nil, err
+	}
+	return helm.ReleaseRes{Release: rel}, nil
+}
+
+// getHelmRevision uses captured flags so a context switch cannot redirect a read.
+func getHelmRevision(ctx context.Context, flags *genericclioptions.ConfigFlags, path string) (*release.Release, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -68,7 +79,7 @@ func (h *HelmHistory) Get(ctx context.Context, path string) (runtime.Object, err
 	}
 
 	ns, n := client.Namespaced(fqn)
-	cfg, err := helmConfigFor(h.Client().Config().Flags(), ns)
+	cfg, err := helmConfigFor(flags, ns)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +98,7 @@ func (h *HelmHistory) Get(ctx context.Context, path string) (runtime.Object, err
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	return helm.ReleaseRes{Release: resp}, nil
+	return resp, nil
 }
 
 // Describe returns the chart notes.
