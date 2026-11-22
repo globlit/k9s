@@ -32,6 +32,9 @@ k9s:
     exclusions:
       namespaces: []
       labels: {}
+  debugContainer:
+    image: busybox:1.37.0
+    profile: general
   logger:
     tail: 200
     buffer: 2000
