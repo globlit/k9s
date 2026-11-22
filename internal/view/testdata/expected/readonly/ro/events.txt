@@ -1,0 +1,16 @@
+/            Filter Mode
+?            Help
+Ctrl-S       Save
+Ctrl-Space   Mark Range
+Ctrl-W       Toggle Wide
+Ctrl-Z       Toggle Faults
+Ctrl-\       Marks Clear
+Enter        Filter
+Esc          Filter Reset
+Shift-A      Sort Age
+Shift-N      Sort Name
+Shift-O      Sort Selected Column
+Shift-S      Sort Status
+key-272      Help
+q            Filter Reset
+space        Mark

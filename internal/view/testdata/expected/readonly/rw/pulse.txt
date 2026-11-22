@@ -1,0 +1,11 @@
+Backtab      Prev
+Down         Down
+Enter        Goto
+Left         Prev
+Right        Next
+Tab          Next
+Up           Up
+h            Prev
+j            Down
+k            Up
+l            Next

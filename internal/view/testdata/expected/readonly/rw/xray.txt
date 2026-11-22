@@ -1,0 +1,5 @@
+/            Filter Mode
+Enter        Goto
+Esc          Filter Reset
+space        Expand/Collapse
+x            Expand/Collapse All

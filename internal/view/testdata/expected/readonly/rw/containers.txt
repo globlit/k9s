@@ -1,0 +1,22 @@
+/            Filter Mode
+?            Help
+Ctrl-R       Refresh
+Ctrl-S       Save
+Ctrl-W       Toggle Wide
+Ctrl-Z       Toggle Faults
+Ctrl-\       Marks Clear
+Enter        View
+Esc          Filter Reset
+Shift-A      Sort Age
+Shift-F      PortForward
+Shift-N      Sort Name
+Shift-O      Sort Selected Column
+Shift-S      Sort Status
+a            Attach [dangerous]
+c            Copy
+f            Show PortForward
+key-272      Help
+l            Logs
+p            Logs Previous
+q            Filter Reset
+s            Shell [dangerous]

@@ -1,0 +1,13 @@
+/            Filter Mode
+?            Help
+Ctrl-R       Refresh
+Ctrl-\       Marks Clear
+Enter        Goto
+Esc          Filter Reset
+Shift-N      Sort Name
+Shift-O      Sort Selected Column
+Shift-S      Sort Status
+c            Copy
+key-272      Help
+q            Filter Reset
+y            YAML
