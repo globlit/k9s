@@ -83,7 +83,7 @@ func TestFetchResourceObjectReturnsRawAPIObjects(t *testing.T) {
 	node := simNode("worker")
 	node.SetUID("node-uid")
 	cr := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "example.com/v1", "kind": "Widget", "metadata": map[string]any{"name": "widget", "namespace": "ns1", "uid": "cr-uid"}}}
-	fc := fakecluster.New(t, fakecluster.WithObjects(pod, node, cr))
+	fc := fakecluster.New(t, fakecluster.WithCRD(client.NewGVR("example.com/v1/widgets"), "Widget", true), fakecluster.WithObjects(pod, node, cr))
 	factory := watch.NewFactory(fc.Conn())
 	t.Cleanup(factory.Terminate)
 	for _, tc := range []struct {

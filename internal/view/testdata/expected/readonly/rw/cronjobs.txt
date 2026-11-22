@@ -24,7 +24,7 @@ e            Edit [dangerous]
 key-272      Help
 n            Copy Namespace
 q            Filter Reset
-s            Suspend/Resume
+s            Suspend/Resume [dangerous]
 space        Mark
 t            Trigger
 w            Warp To Namespace

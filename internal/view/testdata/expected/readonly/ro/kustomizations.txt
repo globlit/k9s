@@ -8,7 +8,6 @@ Ctrl-\       Marks Clear
 Enter        Filter
 Esc          Filter Reset
 Shift-A      Sort Age
-Shift-E      Events
 Shift-J      Jump Owner
 Shift-N      Sort Name
 Shift-O      Sort Selected Column
