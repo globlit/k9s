@@ -202,11 +202,18 @@ func TestE2EEveryViewer(t *testing.T) {
 }
 
 func TestE2EBenchmarksWithoutDir(t *testing.T) {
-	t.Skip("bug: the benchmarks view does not create its dir, so a new user sees a watcher error")
 	s := NewSimApp(t, e2eCluster(t))
 	s.e2eGoto(":bench", "Benchmarks")
 
 	assert.DirExists(t, benchDir(s.App().Config))
+}
+
+func TestE2ECustomResourceDefinition(t *testing.T) {
+	fc := e2eCluster(t, fakecluster.WithCRD(client.NewGVR("fred.com/v1/blees"), "Blee", true))
+	s := NewSimApp(t, fc)
+	s.e2eWait("web-7d9-aaaaa")
+
+	s.e2eGoto(":crd", "CustomResourceDefinition", "customresourcedefinitions(all)[1]", "fred.com", "Blee", "Namespaced")
 }
 
 func TestE2ENamespaceSwitch(t *testing.T) {

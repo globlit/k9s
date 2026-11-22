@@ -169,7 +169,8 @@ func (a *App) layout(ctx context.Context) {
 	main := tview.NewFlex().SetDirection(tview.FlexRow)
 	main.AddItem(a.statusIndicator(), 1, 1, false)
 	main.AddItem(a.Content, 0, 10, true)
-	if !a.Config.K9s.IsCrumbsless() {
+	a.showCrumbs = !a.Config.K9s.IsCrumbsless()
+	if a.showCrumbs {
 		main.AddItem(a.Crumbs(), 1, 1, false)
 	}
 	main.AddItem(flash, 1, 1, false)

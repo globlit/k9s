@@ -132,7 +132,6 @@ func TestE2ELogsPod(t *testing.T) {
 }
 
 func TestE2ELogsInvalidFilter(t *testing.T) {
-	t.Skip("bug: after an invalid regex filter, esc does not always bring back the log lines (seen with -race)")
 	s := e2eLogApp(t)
 	s.e2eGoto(":pod ns-a /api", "Pod", "api-0")
 	s.Keys('l')
@@ -142,7 +141,12 @@ func TestE2ELogsInvalidFilter(t *testing.T) {
 	s.e2eWait("error parsing regexp")
 	s.Keys(tcell.KeyEscape)
 	s.e2eWait("line-0", "line-1", "line-2")
-	s.e2eGone("error parsing regexp")
+	s.e2eSettle()
+	s.e2eWait("line-0", "line-1", "line-2")
+	// The flash keeps the error for its full delay. Check the log pane only.
+	var text string
+	s.OnLoop(func() { text = s.App().Content.Top().(*Log).logs.GetText(true) })
+	assert.NotContains(t, text, "error parsing regexp")
 	assert.Equal(t, "logs", s.TopView())
 }
 

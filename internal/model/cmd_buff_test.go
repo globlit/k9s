@@ -5,6 +5,7 @@ package model_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/globlit/k9s/internal/model"
 	"github.com/stretchr/testify/assert"
@@ -82,6 +83,36 @@ func TestCmdBuffChanged(t *testing.T) {
 	assert.Empty(t, l.text)
 	assert.Empty(t, b.GetText())
 	assert.True(t, b.Empty())
+}
+
+type completedCounter struct {
+	texts []string
+}
+
+func (*completedCounter) BufferChanged(_, _ string)           {}
+func (*completedCounter) BufferActive(bool, model.BufferKind) {}
+func (c *completedCounter) BufferCompleted(t, _ string)       { c.texts = append(c.texts, t) }
+
+func TestCmdBuffClearDropsPending(t *testing.T) {
+	b, l := model.NewCmdBuff('/', model.FilterBuffer), completedCounter{}
+	held := make(chan func(), 2)
+	b.SetQueue(func(f func()) { held <- f })
+	b.AddListener(&l)
+
+	b.Add('x')
+	stale := <-held
+	b.ClearText(true)
+	b.Add('y')
+	stale()
+	assert.Equal(t, []string{""}, l.texts)
+
+	select {
+	case apply := <-held:
+		apply()
+	case <-time.After(time.Second):
+		t.Fatal("no debounce after the clear")
+	}
+	assert.Equal(t, []string{"", "y"}, l.texts)
 }
 
 func TestCmdBuffAdd(t *testing.T) {

@@ -564,12 +564,15 @@ func (x *Xray) TreeLoadFailed(err error) {
 	x.app.Flash().Err(err)
 }
 
+// update builds the tree on the UI loop, because tview.NewTreeNode reads the global styles.
 func (x *Xray) update(node *xray.TreeNode) {
+	x.app.QueueUpdateDraw(func() { x.setTree(node) })
+}
+
+func (x *Xray) setTree(node *xray.TreeNode) {
 	root := makeTreeNode(node, x.ExpandNodes(), x.app.Config.K9s.UI.NoIcons, x.app.Styles)
 	if node == nil {
-		x.app.QueueUpdateDraw(func() {
-			x.SetRoot(root)
-		})
+		x.SetRoot(root)
 		return
 	}
 
@@ -580,30 +583,28 @@ func (x *Xray) update(node *xray.TreeNode) {
 		x.SetSelectedItem(node.Spec().Path())
 	}
 
-	x.app.QueueUpdateDraw(func() {
-		x.SetRoot(root)
-		root.Walk(func(node, parent *tview.TreeNode) bool {
-			spec, ok := node.GetReference().(xray.NodeSpec)
-			if !ok {
-				slog.Error("Expecting a NodeSpec",
-					slogs.FQN, node.GetText(),
-					slogs.RefType, fmt.Sprintf("%T", node.GetReference()),
-				)
-				return false
-			}
-			// BOZO!! Figure this out expand/collapse but the root
-			if parent != nil {
-				node.SetExpanded(x.ExpandNodes())
-			} else {
-				node.SetExpanded(true)
-			}
+	x.SetRoot(root)
+	root.Walk(func(node, parent *tview.TreeNode) bool {
+		spec, ok := node.GetReference().(xray.NodeSpec)
+		if !ok {
+			slog.Error("Expecting a NodeSpec",
+				slogs.FQN, node.GetText(),
+				slogs.RefType, fmt.Sprintf("%T", node.GetReference()),
+			)
+			return false
+		}
+		// BOZO!! Figure this out expand/collapse but the root
+		if parent != nil {
+			node.SetExpanded(x.ExpandNodes())
+		} else {
+			node.SetExpanded(true)
+		}
 
-			if spec.AsPath() == x.GetSelectedItem() {
-				node.SetExpanded(true).SetSelectable(true)
-				x.SetCurrentNode(node)
-			}
-			return true
-		})
+		if spec.AsPath() == x.GetSelectedItem() {
+			node.SetExpanded(true).SetSelectable(true)
+			x.SetCurrentNode(node)
+		}
+		return true
 	})
 }
 

@@ -139,6 +139,9 @@ func (p *Prompt) SetModel(m PromptModel) {
 	}
 	p.model = m
 	p.model.AddListener(p)
+	if q, ok := m.(interface{ SetQueue(func(func())) }); ok && p.app != nil {
+		q.SetQueue(p.app.QueueUpdateDraw)
+	}
 }
 
 func (p *Prompt) keyboard(evt *tcell.EventKey) *tcell.EventKey {

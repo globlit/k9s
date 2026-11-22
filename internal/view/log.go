@@ -277,7 +277,6 @@ func (l *Log) LogChanged(lines [][]byte) {
 
 // BufferCompleted indicates input was accepted.
 func (l *Log) BufferCompleted(text, _ string) {
-	// Runs on the command buffer debounce goroutine.
 	l.model.Filter(text)
 	l.app.QueueUpdateDraw(l.updateTitle)
 }

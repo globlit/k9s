@@ -57,7 +57,6 @@ func TestE2EContextSwitch(t *testing.T) {
 }
 
 func TestE2EContextSwitchRace(t *testing.T) {
-	t.Skip("bug: the command buffer debounce goroutine draws the prompt while a context switch reloads the styles; run with -race")
 	fc := e2eCluster(t, fakecluster.WithContext("e2e-a"), fakecluster.WithContext("e2e-b"))
 	s := NewSimApp(t, fc, SimView("pod"))
 	s.e2eWait("Context: e2e-b")
@@ -127,7 +126,6 @@ func TestE2EAliasesHelpHeader(t *testing.T) {
 }
 
 func TestE2ECrumbsToggle(t *testing.T) {
-	t.Skip("bug: App.layout does not set showCrumbs, so the first ctrl-g does nothing")
 	s := NewSimApp(t, e2eCluster(t))
 	s.e2eWait("<pod>")
 
