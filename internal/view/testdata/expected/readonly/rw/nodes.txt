@@ -1,0 +1,24 @@
+/            Filter Mode
+?            Help
+Ctrl-D       Delete [dangerous]
+Ctrl-R       Refresh
+Ctrl-S       Save
+Ctrl-Space   Mark Range
+Ctrl-W       Toggle Wide
+Ctrl-Z       Toggle Faults
+Ctrl-\       Marks Clear
+Enter        View
+Esc          Filter Reset
+Shift-A      Sort Age
+Shift-N      Sort Name
+Shift-O      Sort Selected Column
+Shift-S      Sort Status
+c            Cordon [dangerous]
+d            Describe
+e            Edit [dangerous]
+key-272      Help
+q            Filter Reset
+r            Drain [dangerous]
+space        Mark
+u            Uncordon [dangerous]
+y            YAML

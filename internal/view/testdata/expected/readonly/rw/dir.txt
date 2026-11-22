@@ -1,0 +1,16 @@
+/            Filter Mode
+?            Help
+Ctrl-R       Refresh
+Ctrl-\       Marks Clear
+Enter        Goto
+Esc          Filter Reset
+Shift-N      Sort Name
+Shift-O      Sort Selected Column
+Shift-S      Sort Status
+a            Apply [dangerous]
+c            Copy
+d            Delete [dangerous]
+e            Edit [dangerous]
+key-272      Help
+q            Filter Reset
+y            YAML

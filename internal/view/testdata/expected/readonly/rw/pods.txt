@@ -1,0 +1,39 @@
+/            Filter Mode
+0            all
+1            ns1
+2            default
+?            Help
+Ctrl-D       Delete [dangerous]
+Ctrl-K       Kill [dangerous]
+Ctrl-R       Refresh
+Ctrl-S       Save
+Ctrl-Space   Mark Range
+Ctrl-W       Toggle Wide
+Ctrl-Z       Toggle Faults
+Ctrl-\       Marks Clear
+Enter        View
+Esc          Filter Reset
+Shift-A      Sort Age
+Shift-F      Port-Forward
+Shift-J      Jump Owner
+Shift-N      Sort Name
+Shift-O      Sort Selected Column
+Shift-S      Sort Status
+a            Attach [dangerous]
+c            Copy
+d            Describe
+e            Edit [dangerous]
+f            Show PortForward
+i            Set Image
+key-272      Help
+l            Logs
+n            Copy Namespace
+o            Show Node
+p            Logs Previous
+q            Filter Reset
+s            Shell [dangerous]
+space        Mark
+t            Transfer [dangerous]
+w            Warp To Namespace
+y            YAML
+z            Sanitize [dangerous]

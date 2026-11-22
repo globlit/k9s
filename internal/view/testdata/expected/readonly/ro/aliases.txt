@@ -1,0 +1,14 @@
+/            Filter Mode
+?            Help
+Ctrl-R       Refresh
+Ctrl-Z       Toggle Faults
+Ctrl-\       Marks Clear
+Enter        Goto
+Esc          Filter Reset
+Shift-A      Sort ApiGroup
+Shift-C      Sort Command
+Shift-O      Sort Selected Column
+Shift-R      Sort Resource
+c            Copy
+key-272      Help
+q            Filter Reset

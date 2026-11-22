@@ -1,0 +1,19 @@
+/            Filter Mode
+?            Help
+Ctrl-D       Delete
+Ctrl-S       Save
+Ctrl-Space   Mark Range
+Ctrl-W       Toggle Wide
+Ctrl-Z       Toggle Faults
+Ctrl-\       Marks Clear
+Enter        View Benchmarks
+Esc          Filter Reset
+Shift-A      Sort Age
+Shift-N      Sort Name
+Shift-O      Sort Selected Column
+Shift-P      Sort Ports
+Shift-U      Sort URL
+b            Benchmark Run/Stop
+key-272      Help
+q            Filter Reset
+space        Mark

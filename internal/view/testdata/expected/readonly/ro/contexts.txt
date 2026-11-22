@@ -1,0 +1,15 @@
+/            Filter Mode
+?            Help
+Ctrl-R       Refresh
+Ctrl-S       Save
+Ctrl-W       Toggle Wide
+Ctrl-Z       Toggle Faults
+Ctrl-\       Marks Clear
+Enter        View
+Esc          Filter Reset
+Shift-N      Sort Name
+Shift-O      Sort Selected Column
+Shift-S      Sort Status
+c            Copy
+key-272      Help
+q            Filter Reset
