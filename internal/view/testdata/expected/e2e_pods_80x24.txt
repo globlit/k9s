@@ -1,0 +1,23 @@
+ Context: fake [RW]                                <0… ____  __ ________
+ Cluster: fake                                     <1>|    |/  /   __   \______
+ User:    fake                                        |       /\____    /  ___/
+ K9s Rev: v0.0.0                                      |    \   \  /    /\___  \
+ K8s Rev: v1.37.2                                     |____|\__ \/____//____  /
+ CPU:     n/a                                                  \/           \/
+ MEM:     n/a
+┌──────────────────────────────── pods(all)[5] ────────────────────────────────┐
+│ NAMESPACE↑  NAME           PF READY STATUS   RESTARTS IP        NODE    AGE  │
+│ ns-a        api-0          ●  1/1   Running         0 10.0.0.1  node-1  3d   │
+│ ns-a        web-7d9-aaaaa  ●  2/2   Running         0 10.0.0.1  node-1  10d  │
+│ ns-a        web-7d9-bbbbb  ●  2/2   Running         0 10.0.0.1  node-1  9d   │
+│ ns-b        cache-0        ●  1/1   Running         0 10.0.0.1  node-1  5d   │
+│ ns-b        db-0           ●  1/1   Running         0 10.0.0.1  node-1  30d  │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+  <pod>

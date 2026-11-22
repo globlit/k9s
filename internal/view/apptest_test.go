@@ -12,6 +12,7 @@ import (
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/config"
 	"github.com/globlit/k9s/internal/dao"
+	"github.com/globlit/k9s/internal/model"
 	"github.com/globlit/k9s/internal/testutil/fakecluster"
 	"github.com/globlit/k9s/internal/ui"
 	"github.com/globlit/tcell/v2"
@@ -41,6 +42,7 @@ type simOpts struct {
 	readOnly bool
 	ns       string
 	view     string
+	w, h     int
 }
 
 // SimOption configures a SimApp.
@@ -55,10 +57,13 @@ func SimNamespace(ns string) SimOption { return func(o *simOpts) { o.ns = ns } }
 // SimView sets the start view command, for example "deploy".
 func SimView(v string) SimOption { return func(o *simOpts) { o.view = v } }
 
+// SimSize sets the screen size. The default is 160x50.
+func SimSize(w, h int) SimOption { return func(o *simOpts) { o.w, o.h = w, h } }
+
 // NewSimApp starts an App on fc and waits for the first view.
 func NewSimApp(t testing.TB, fc *fakecluster.Cluster, opts ...SimOption) *SimApp {
 	t.Helper()
-	o := simOpts{ns: client.NamespaceAll}
+	o := simOpts{ns: client.NamespaceAll, w: simWidth, h: simHeight}
 	for _, f := range opts {
 		f(&o)
 	}
@@ -83,7 +88,7 @@ func NewSimApp(t testing.TB, fc *fakecluster.Cluster, opts ...SimOption) *SimApp
 
 	s.scr = tcell.NewSimulationScreen("UTF-8")
 	require.NoError(t, s.scr.Init())
-	s.scr.SetSize(simWidth, simHeight)
+	s.scr.SetSize(o.w, o.h)
 
 	s.app = NewApp(cfg)
 	require.NoError(t, s.app.Init("v0.0.0-test", 1))
@@ -133,6 +138,14 @@ func saveMetas() func() {
 	}
 }
 
+// Use sends failures to t until the returned func runs. Call it in subtests.
+func (s *SimApp) Use(t testing.TB) func() {
+	old := s.t
+	s.t = t
+
+	return func() { s.t = old }
+}
+
 // App returns the app under test.
 func (s *SimApp) App() *App { return s.app }
 
@@ -156,11 +169,14 @@ func (s *SimApp) onLoop(f func()) {
 	}
 }
 
-// Keys sends keys in order. Each arg is a tcell.Key, a rune or a string.
+// Keys sends keys in order. Each arg is a tcell.Key, a rune, a string or
+// a *tcell.EventKey.
 func (s *SimApp) Keys(kk ...any) {
 	s.t.Helper()
 	for _, k := range kk {
 		switch k := k.(type) {
+		case *tcell.EventKey:
+			s.key(k)
 		case tcell.Key:
 			s.key(tcell.NewEventKey(k, 0, tcell.ModNone))
 		case rune:
@@ -244,7 +260,23 @@ func (s *SimApp) Eventually(fn func() bool, msg string) {
 }
 
 // Screen returns the screen text, one line per row, right spaces trimmed.
+// It reads the cells on the event loop, which also draws them.
 func (s *SimApp) Screen() string {
+	var (
+		scr  string
+		done bool
+	)
+	if !s.Stopped() {
+		s.onLoop(func() { scr, done = s.screen(), true })
+	}
+	if !done {
+		scr = s.screen()
+	}
+
+	return scr
+}
+
+func (s *SimApp) screen() string {
 	cells, w, h := s.scr.GetContents()
 	var b strings.Builder
 	for y := range h {
@@ -276,7 +308,30 @@ func (s *SimApp) Row(i int) string {
 
 // Flash returns the flash message row.
 func (s *SimApp) Flash() string {
-	return strings.TrimSpace(s.Row(simHeight - 1))
+	_, h := s.scr.Size()
+	return strings.TrimSpace(s.Row(h - 1))
+}
+
+// Resize sets a new screen size and waits for the redraw.
+func (s *SimApp) Resize(w, h int) {
+	s.t.Helper()
+	s.scr.SetSize(w, h)
+	s.Sync()
+}
+
+// Top returns the top content component.
+func (s *SimApp) Top() model.Component {
+	s.t.Helper()
+	var c model.Component
+	s.onLoop(func() { c = s.app.Content.Top() })
+
+	return c
+}
+
+// OnLoop runs f on the event loop and waits for it.
+func (s *SimApp) OnLoop(f func()) {
+	s.t.Helper()
+	s.onLoop(f)
 }
 
 // TopView returns the name of the top content view.

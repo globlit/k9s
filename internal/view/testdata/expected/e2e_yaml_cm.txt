@@ -1,0 +1,49 @@
+ Context: fake [RW]                                <c>       Copy                  <f> Toggle FullScreen                               ____  __ ________
+ Cluster: fake                                     <e>       Edit                  <m> Toggle ManagedFields                           |    |/  /   __   \______
+ User:    fake                                     <n>       Next Match                                                               |       /\____    /  ___/
+ K9s Rev: v0.0.0                                   <shift-n> Prev Match                                                               |    \   \  /    /\___  \
+ K8s Rev: v1.37.2                                  <r>       Toggle Auto-Refresh                                                      |____|\__ \/____//____  /
+ CPU:     n/a                                      <x>       Toggle Decode                                                                     \/           \/
+ MEM:     n/a
+┌───────────────────────────────────────────────────────────────────── YAML(ns-a/web-cfg) ─────────────────────────────────────────────────────────────────────┐
+│ apiVersion: v1                                                                                                                                               │
+│ data:                                                                                                                                                        │
+│   mode: prod                                                                                                                                                 │
+│ kind: ConfigMap                                                                                                                                              │
+│ metadata:                                                                                                                                                    │
+│   creationTimestamp: "<time>"                                                                                                                  │
+│   name: web-cfg                                                                                                                                              │
+│   namespace: ns-a                                                                                                                                            │
+│   uid: uid-ns-a-web-cfg                                                                                                                                      │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+  <configmap>   <yaml>
