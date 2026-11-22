@@ -23,6 +23,7 @@ const (
 	detailsTitleFmt = "[fg:bg:b] %s([hilite:bg:b]%s[fg:bg:-])[fg:bg:-] "
 	contentTXT      = "text"
 	contentYAML     = "yaml"
+	contentDiff     = "diff"
 )
 
 // Details represents a generic text viewer.
@@ -100,6 +101,8 @@ func (d *Details) InCmdMode() bool {
 func (d *Details) TextChanged(lines []string) {
 	d.app.QueueUpdateDraw(func() {
 		switch d.contentType {
+		case contentDiff:
+			d.text.SetText(colorizeDiff(d.app.Styles.Views().Diff, lines, nil))
 		case contentYAML:
 			d.text.SetText(colorizeYAML(d.app.Styles.Views().Yaml, strings.Join(lines, "\n")))
 		default:
@@ -111,10 +114,14 @@ func (d *Details) TextChanged(lines []string) {
 
 // TextFiltered notifies when the filter changed.
 func (d *Details) TextFiltered(lines []string, matches fuzzy.Matches) {
-	ll := linesWithRegions(lines, matches)
 	d.app.QueueUpdateDraw(func() {
 		d.currentRegion, d.maxRegions = 0, len(matches)
-		d.text.SetText(colorizeYAML(d.app.Styles.Views().Yaml, strings.Join(ll, "\n")))
+		if d.contentType == contentDiff {
+			d.text.SetText(colorizeDiff(d.app.Styles.Views().Diff, lines, matches))
+		} else {
+			ll := linesWithRegions(lines, matches)
+			d.text.SetText(colorizeYAML(d.app.Styles.Views().Yaml, strings.Join(ll, "\n")))
+		}
 		d.text.Highlight()
 		if len(matches) > 0 {
 			d.text.Highlight("search_0")

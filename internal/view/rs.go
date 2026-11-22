@@ -35,6 +35,7 @@ func NewReplicaSet(gvr *client.GVR) ResourceViewer {
 }
 
 func (r *ReplicaSet) bindKeys(aa *ui.KeyActions) {
+	aa.Add(ui.KeyShiftD, ui.NewKeyAction("Diff", r.diffCmd, true))
 	if r.App().Config.IsReadOnly() {
 		return
 	}
@@ -81,5 +82,19 @@ func (r *ReplicaSet) rollbackCmd(evt *tcell.EventKey) *tcell.EventKey {
 			})
 	}, func() {})
 
+	return nil
+}
+
+func (r *ReplicaSet) diffCmd(evt *tcell.EventKey) *tcell.EventKey {
+	paths := r.GetTable().GetSelectedItems()
+	if len(paths) == 0 {
+		return evt
+	}
+	openDiff(r, func(ctx context.Context) (diffContent, error) {
+		var resource dao.ReplicaSet
+		resource.Init(r.App().factory, r.GVR())
+		text, subject, err := resource.Diff(ctx, paths)
+		return diffContent{subject: subject, values: text}, err
+	})
 	return nil
 }

@@ -59,8 +59,9 @@ func (h *History) bindKeys(aa *ui.KeyActions) {
 		h.bindDangerousKeys(aa)
 	}
 
-	aa.Delete(ui.KeyShiftA, ui.KeyShiftN, tcell.KeyCtrlS, tcell.KeyCtrlSpace, ui.KeySpace, tcell.KeyCtrlD)
+	aa.Delete(ui.KeyShiftA, ui.KeyShiftN, tcell.KeyCtrlS, tcell.KeyCtrlD)
 	aa.Bulk(ui.KeyMap{
+		ui.KeyShiftD: ui.NewKeyAction("Diff", h.diffCmd, true),
 		ui.KeyShiftN: ui.NewKeyAction("Sort Revision", h.GetTable().SortColCmd("REVISION", true), false),
 	})
 }
@@ -132,4 +133,18 @@ func (h *History) rollback(ctx context.Context, path, rev string) error {
 	hm.Init(h.App().factory, h.GVR())
 
 	return hm.Rollback(ctx, path, rev)
+}
+
+func (h *History) diffCmd(evt *tcell.EventKey) *tcell.EventKey {
+	paths := h.GetTable().GetSelectedItems()
+	if len(paths) == 0 {
+		return evt
+	}
+	openDiff(h, func(ctx context.Context) (diffContent, error) {
+		var history dao.HelmHistory
+		history.Init(h.App().factory, h.GVR())
+		result, err := history.Diff(ctx, paths)
+		return diffContent{subject: result.Subject, values: result.Values, manifest: result.Manifest}, err
+	})
+	return nil
 }

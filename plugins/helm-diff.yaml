@@ -1,3 +1,5 @@
+# Helm history has native Shift-D diffs (values/manifest and two marked revisions).
+# This optional plugin retains release-view and current-revision shortcuts.
 # Requires helm-diff plugin installed: https://github.com/databus23/helm-diff
 # In helm view: <Shift-D> Diff with Previous Revision
 # In helm-history view: <Shift-Q> Diff with Current Revision
