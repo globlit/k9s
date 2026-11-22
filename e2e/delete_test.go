@@ -103,7 +103,7 @@ func TestForceDeletePod(t *testing.T) {
 	h.WaitFor(" sleeper ", 10*time.Second)
 	h.SendKeys("C-d")
 	h.WaitFor("Force:", 10*time.Second)
-	h.SendKeys("BTab", "Space", "Tab", "Tab", "Enter")
+	h.SendKeys("BTab", "Space", "Tab", "Tab", "Tab", "Enter")
 
 	// The pod has a grace period of 120s: only a force delete is this fast.
 	h.Eventually(20*time.Second, "pod is gone", func() bool { return !h.Exists("pod/sleeper") })
