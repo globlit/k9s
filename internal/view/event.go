@@ -111,6 +111,6 @@ func resourceEvents(path string, obj map[string]any) (ResourceViewer, string, er
 	v := NewEvent(client.EvGVR)
 	v.SetContextFn(chainContext(func(ctx context.Context) context.Context {
 		return context.WithValue(ctx, internal.KeyPath, path)
-	}, fields.OneTermEqualSelector("involvedObject.uid", string(u.GetUID())).String()))
+	}, fields.OneTermEqualSelector("regarding.uid", string(u.GetUID())).String()))
 	return v, ns, nil
 }

@@ -5,6 +5,9 @@ package view
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/globlit/k9s/internal"
@@ -14,6 +17,8 @@ import (
 	"github.com/globlit/k9s/internal/watch"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
 )
@@ -29,12 +34,47 @@ func TestResourceEvents(t *testing.T) {
 			}
 			assert.Equal(t, expectedNS, target)
 			ctx := v.GetContextFn()(context.Background())
-			assert.Equal(t, "involvedObject.uid=original-uid", ctx.Value(internal.KeyFields))
+			assert.Equal(t, "regarding.uid=original-uid", ctx.Value(internal.KeyFields))
 			assert.Equal(t, "team-a/example", ctx.Value(internal.KeyPath))
 		})
 	}
 	_, _, err := resourceEvents("team-a/example", map[string]any{})
 	require.ErrorContains(t, err, "no UID")
+}
+
+func TestResourceEventsUsesServedAPI(t *testing.T) {
+	fc := fakecluster.New(t, fakecluster.WithAPIServer())
+	requests := make(chan string, 1)
+	fc.Intercept(func(w http.ResponseWriter, r *http.Request) bool {
+		if !strings.HasSuffix(r.URL.Path, "/events") {
+			return false
+		}
+		selector := r.URL.Query().Get("fieldSelector")
+		requests <- r.URL.Path + "?" + selector
+		w.Header().Set("Content-Type", "application/json")
+		// Match the served events.k8s.io/v1 contract, which rejects core Event labels.
+		if r.URL.Path != "/apis/events.k8s.io/v1/namespaces/team-a/events" || selector != "regarding.uid=original-uid" {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(apierrors.NewBadRequest("unsupported Event field selector").Status())
+			return true
+		}
+		_ = json.NewEncoder(w).Encode(metav1.Table{TypeMeta: metav1.TypeMeta{APIVersion: "meta.k8s.io/v1", Kind: "Table"}})
+		return true
+	})
+	factory := watch.NewFactory(fc.Conn())
+	t.Cleanup(factory.Terminate)
+	v, ns, err := resourceEvents("team-a/example", map[string]any{"metadata": map[string]any{"namespace": "team-a", "uid": "original-uid"}})
+	require.NoError(t, err)
+	var resource dao.Table
+	resource.Init(factory, v.GVR())
+	_, err = resource.List(v.GetContextFn()(context.Background()), ns)
+	require.NoError(t, err)
+	select {
+	case request := <-requests:
+		assert.Equal(t, "/apis/events.k8s.io/v1/namespaces/team-a/events?regarding.uid=original-uid", request)
+	default:
+		t.Fatal("events were not requested from the API")
+	}
 }
 
 func TestFetchResourceObjectReturnsRawAPIObjects(t *testing.T) {
