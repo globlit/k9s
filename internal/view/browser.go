@@ -792,17 +792,22 @@ func (b *Browser) simpleDelete(selections []string, msg string) {
 // and the table.
 func (b *Browser) deleteAsync(selections []string, del func(context.Context, string) error) {
 	gvr := b.GVR()
-	runAsync(b.defaultContext(), b.app, selections, "delete",
-		func(ctx context.Context, sel string) error {
-			if err := del(ctx, sel); err != nil {
-				return err
+	top := b.app.Content.Top()
+	activeContext := b.app.Config.K9s.ActiveContextName()
+	factory := b.app.factory
+	runAsync(b.defaultContext(), b.app, selections, "delete", del,
+		func(done []string, errs []error) {
+			if b.app.Config.K9s.ActiveContextName() != activeContext {
+				return
 			}
 			if gvr == client.PodGVR {
-				b.app.factory.DeleteForwarder(sel)
+				for _, sel := range done {
+					factory.DeleteForwarder(sel)
+				}
 			}
-			return nil
-		},
-		func(done []string, errs []error) {
+			if b.app.Content.Top() != top {
+				return
+			}
 			for _, sel := range done {
 				b.GetTable().DeleteMark(sel)
 			}

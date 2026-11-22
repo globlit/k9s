@@ -4,6 +4,7 @@
 package view
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -383,4 +384,59 @@ func TestSimpleDeleteLocalViews(t *testing.T) {
 		assert.Equal(t, []string{fb.id}, fwdIDs(s.app.factory))
 		assert.Empty(t, fc.Deletes())
 	})
+}
+
+// The final failure supplies a completion signal from the same UI callback as
+// delete cleanup, so the assertions do not depend on arbitrary sleeps.
+func TestBrowserDeleteCompletionAfterNavigation(t *testing.T) {
+	for _, changeContext := range []bool{false, true} {
+		t.Run(map[bool]string{false: "view", true: "context"}[changeContext], func(t *testing.T) {
+			fc := fakecluster.New(t, fakecluster.WithContext("other"), fakecluster.WithNamespaces("ns1", "ns2"), fakecluster.WithObjects(simPod("ns1", "pod-a")))
+			release := make(chan struct{})
+			var once sync.Once
+			unblock := func() { once.Do(func() { close(release) }) }
+			t.Cleanup(unblock)
+			var started atomic.Bool
+			fc.Dyn().PrependReactor("delete", "pods", func(k8stesting.Action) (bool, runtime.Object, error) {
+				started.Store(true)
+				select {
+				case <-release:
+				case <-time.After(simTimeout):
+				}
+				return false, nil, nil
+			})
+			s := NewSimApp(t, fc, SimNamespace("ns1"), SimView("pods"))
+			selectPath(t, s, "ns1/pod-a")
+			pod := topViewer(t, s).(*Pod)
+			forward := newSimFwd("ns1/pod-a")
+			s.app.factory.AddForwarder(forward)
+			s.onLoop(func() {
+				pod.browser.deleteAsync([]string{"ns1/pod-a", "ns1/missing"}, func(ctx context.Context, path string) error {
+					if path == "ns1/missing" {
+						return errors.New("completion marker")
+					}
+					return fc.Dyn().Resource(client.PodGVR.GVR()).Namespace("ns1").Delete(ctx, "pod-a", metav1.DeleteOptions{})
+				})
+			})
+			s.Eventually(started.Load, "delete did not start")
+			if changeContext {
+				s.onLoop(func() {
+					require.NoError(t, fc.Conn().SwitchContext(fakecluster.DefaultContext))
+					_, err := s.app.Config.K9s.ActivateContext(fakecluster.DefaultContext)
+					require.NoError(t, err)
+					require.NoError(t, s.app.Config.SetActiveNamespace("ns2"))
+					forward = newSimFwd("ns1/pod-a")
+					s.app.factory.AddForwarder(forward)
+				})
+			} else {
+				s.Cmd("deploy ns2")
+				require.NotSame(t, pod, topViewer(t, s))
+			}
+			assert.Equal(t, "ns2", s.app.Config.ActiveNamespace())
+			unblock()
+			s.Eventually(flashHas(s, "completion marker"), "delete completion did not run")
+			assert.Equal(t, "ns2", s.app.Config.ActiveNamespace(), "detached source restarted and changed namespace")
+			assert.Equal(t, !changeContext, forward.stopped.Load(), "cleanup touched a forward from another context")
+		})
+	}
 }
