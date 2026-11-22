@@ -9,12 +9,13 @@ import (
 
 	"github.com/globlit/k9s/internal"
 	"github.com/globlit/k9s/internal/client"
-	"github.com/globlit/k9s/internal/config"
+	"github.com/globlit/k9s/internal/dao"
 	"github.com/globlit/k9s/internal/testutil/fakecluster"
 	"github.com/globlit/k9s/internal/watch"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/dynamic"
 )
 
 func TestResourceEvents(t *testing.T) {
@@ -43,13 +44,8 @@ func TestFetchResourceObjectReturnsRawAPIObjects(t *testing.T) {
 	node.SetUID("node-uid")
 	cr := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "example.com/v1", "kind": "Widget", "metadata": map[string]any{"name": "widget", "namespace": "ns1", "uid": "cr-uid"}}}
 	fc := fakecluster.New(t, fakecluster.WithObjects(pod, node, cr))
-	cfg := config.NewConfig(fc.Conn().Config())
-	cfg.SetConnection(fc.Conn())
-	_, err := cfg.K9s.ActivateContext(fc.Conn().ActiveContext())
-	require.NoError(t, err)
-	app := NewApp(cfg)
-	app.factory = watch.NewFactory(fc.Conn())
-	t.Cleanup(app.factory.Terminate)
+	factory := watch.NewFactory(fc.Conn())
+	t.Cleanup(factory.Terminate)
 	for _, tc := range []struct {
 		gvr           *client.GVR
 		path, uid, ns string
@@ -58,11 +54,41 @@ func TestFetchResourceObjectReturnsRawAPIObjects(t *testing.T) {
 		{client.NodeGVR, "-/worker", "node-uid", client.NamespaceAll},
 		{client.NewGVR("example.com/v1/widgets"), "ns1/widget", "cr-uid", "ns1"},
 	} {
-		obj, err := fetchResourceObject(context.Background(), app, tc.gvr, tc.path)
+		var accessor dao.Generic
+		accessor.Init(factory, tc.gvr)
+		require.NoError(t, accessor.PinClient())
+		obj, err := fetchResourceObject(context.Background(), &accessor, tc.path)
 		require.NoError(t, err)
 		assert.Equal(t, tc.uid, string((&unstructured.Unstructured{Object: obj}).GetUID()))
 		_, ns, err := resourceEvents(tc.path, obj)
 		require.NoError(t, err)
 		assert.Equal(t, tc.ns, ns)
 	}
+}
+
+type switchingReadConn struct {
+	client.Connection
+	dynamic dynamic.Interface
+}
+
+func (c *switchingReadConn) DynDial() (dynamic.Interface, error) { return c.dynamic, nil }
+
+func TestFetchResourceObjectKeepsPinnedClient(t *testing.T) {
+	pod := simPod("ns1", "app")
+	pod.UID = "original"
+	original := fakecluster.New(t, fakecluster.WithObjects(pod))
+	pod = pod.DeepCopy()
+	pod.UID = "other-cluster"
+	other := fakecluster.New(t, fakecluster.WithObjects(pod))
+	conn := &switchingReadConn{Connection: original.Conn(), dynamic: original.Dyn()}
+	factory := watch.NewFactory(conn)
+	t.Cleanup(factory.Terminate)
+	var accessor dao.Generic
+	accessor.Init(factory, client.PodGVR)
+	require.NoError(t, accessor.PinClient())
+	conn.dynamic = other.Dyn()
+	obj, err := fetchResourceObject(context.Background(), &accessor, "ns1/app")
+	require.NoError(t, err)
+	assert.Equal(t, "original", string((&unstructured.Unstructured{Object: obj}).GetUID()))
+	assert.Empty(t, other.Actions("get", "pods"))
 }

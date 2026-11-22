@@ -35,8 +35,12 @@ func chainContext(existingCtxFn ContextFunc, fieldSelector string) ContextFunc {
 
 // customJump handles custom jumps between CRDs based on user configuration.
 func customJump(app *App, sourceGVR *client.GVR, sourcePath string, rule *config.JumpRule) error {
-	// Get the source resource to extract metadata for templating
-	sourceObj, err := fetchResourceObject(context.Background(), app, sourceGVR, sourcePath)
+	// Get the source resource to extract metadata for templating.
+	var accessor dao.Generic
+	accessor.Init(app.factory, sourceGVR)
+	ctx, cancel := context.WithTimeout(context.Background(), app.Conn().Config().CallTimeout())
+	defer cancel()
+	sourceObj, err := fetchResourceObject(ctx, &accessor, sourcePath)
 	if err != nil {
 		return fmt.Errorf("failed to fetch source resource: %w", err)
 	}
@@ -112,11 +116,7 @@ func customJump(app *App, sourceGVR *client.GVR, sourcePath string, rule *config
 }
 
 // fetchResourceObject retrieves the full resource object for templating.
-func fetchResourceObject(ctx context.Context, app *App, gvr *client.GVR, path string) (map[string]any, error) {
-	var accessor dao.Generic
-	accessor.Init(app.factory, gvr)
-	ctx, cancel := context.WithTimeout(ctx, app.Conn().Config().CallTimeout())
-	defer cancel()
+func fetchResourceObject(ctx context.Context, accessor *dao.Generic, path string) (map[string]any, error) {
 	o, err := accessor.Get(ctx, path)
 	if err != nil {
 		return nil, err

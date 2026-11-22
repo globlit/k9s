@@ -9,6 +9,7 @@ import (
 
 	"github.com/globlit/k9s/internal"
 	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/dao"
 	"github.com/globlit/k9s/internal/ui"
 	"github.com/globlit/tcell/v2"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -65,10 +66,16 @@ func (b *Browser) eventsCmd(evt *tcell.EventKey) *tcell.EventKey {
 
 	top := b.app.Content.Top()
 	activeContext := b.app.Config.K9s.ActiveContextName()
+	var accessor dao.Generic
+	accessor.Init(b.app.factory, b.GVR())
+	if err := accessor.PinClient(); err != nil {
+		b.app.Flash().Err(err)
+		return nil
+	}
 	var obj map[string]any
 	runAsync(b.defaultContext(), b.app, []string{path}, "Read event source", func(ctx context.Context, path string) error {
 		var err error
-		obj, err = fetchResourceObject(ctx, b.app, b.GVR(), path)
+		obj, err = fetchResourceObject(ctx, &accessor, path)
 		return err
 	}, func(_ []string, errs []error) {
 		if b.app.Content.Top() != top || b.app.Config.K9s.ActiveContextName() != activeContext {
