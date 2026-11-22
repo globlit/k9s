@@ -25,5 +25,6 @@ kind
 *.snap
 /stresser
 __debug_bin*
-fg.yamlbench.txt
+fg.yaml
+bench.txt
 bench-base.txt

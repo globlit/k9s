@@ -17,6 +17,9 @@ GOMAXPROCS      ?= 4
 FUZZTIME        ?= 30s
 BENCH_OUT       ?= bench.txt
 BENCH_BASE      ?= bench-base.txt
+E2E_CLUSTER     := k9s-e2e
+E2E_DIR         ?= $(or $(TMPDIR),/tmp)/k9s-e2e
+E2E_RUN         ?=
 TEST_ENV        := GOMAXPROCS=$(GOMAXPROCS)
 
 SOURCE_DATE_EPOCH ?= $(shell date +%s)
@@ -46,6 +49,26 @@ bench:                   ## Run benchmarks into BENCH_OUT
 bench-compare:           ## Compare BENCH_BASE with BENCH_OUT using benchstat
 	@command -v benchstat >/dev/null 2>&1 || go install golang.org/x/perf/cmd/benchstat@latest
 	@benchstat $(BENCH_BASE) $(BENCH_OUT)
+
+.PHONY: e2e e2e-kind-up e2e-kind-down
+
+e2e-kind-up:             ## Create the capped kind cluster k9s-e2e
+	@mkdir -p $(E2E_DIR)
+	@kind get clusters | grep -qx $(E2E_CLUSTER) || \
+		kind create cluster --name $(E2E_CLUSTER) --config e2e/kind.yaml \
+		--kubeconfig $(E2E_DIR)/kubeconfig --wait 180s
+	@for n in $$(kind get nodes --name $(E2E_CLUSTER)); do \
+		docker update --cpus 2 --memory 3g --memory-swap 3g $$n >/dev/null && echo "capped $$n"; \
+	done
+
+e2e-kind-down:           ## Delete the kind cluster k9s-e2e only
+	@kind delete cluster --name $(E2E_CLUSTER) --kubeconfig $(E2E_DIR)/kubeconfig
+
+e2e:                     ## Build k9s into E2E_DIR and run the kind e2e tests
+	@mkdir -p $(E2E_DIR)
+	@CGO_ENABLED=0 go build -o $(E2E_DIR)/k9s main.go
+	@K9S_E2E_BIN=$(E2E_DIR)/k9s $(TEST_ENV) go test -count=1 -tags e2e -p 1 -timeout 30m \
+		$(if $(E2E_RUN),-run '$(E2E_RUN)') ./e2e/...
 
 lint:                    ## Run golangci-lint
 	@command -v golangci-lint >/dev/null 2>&1 || go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
