@@ -211,6 +211,11 @@ func TestReadOnlyBindings(t *testing.T) {
 			opts = append(opts, SimReadOnly())
 		}
 		s := NewSimApp(t, roCluster(t), opts...)
+		// Empty views bind fewer keys. Seed the local views for stable output.
+		for _, d := range []string{s.app.Config.K9s.ContextScreenDumpDir(), benchDir(s.app.Config)} {
+			require.NoError(t, os.MkdirAll(d, 0o700))
+			require.NoError(t, os.WriteFile(filepath.Join(d, "ns1_pod-a_1.txt"), []byte("x"), 0o600))
+		}
 		for _, v := range roViews {
 			t.Run(mode+"/"+v.name, func(t *testing.T) {
 				openRoView(t, s, v, dir)
