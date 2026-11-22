@@ -14,6 +14,7 @@ import (
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/dao"
 	"github.com/globlit/k9s/internal/testutil/fakecluster"
+	"github.com/globlit/k9s/internal/ui"
 	"github.com/globlit/k9s/internal/watch"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -74,6 +75,29 @@ func TestResourceEventsUsesServedAPI(t *testing.T) {
 		assert.Equal(t, "/apis/events.k8s.io/v1/namespaces/team-a/events?regarding.uid=original-uid", request)
 	default:
 		t.Fatal("events were not requested from the API")
+	}
+}
+
+func TestResourceEventsKeyOnLoadedCRD(t *testing.T) {
+	for _, mode := range []string{"rw", "ro"} {
+		t.Run(mode, func(t *testing.T) {
+			gvr := client.NewGVR("example.com/v1/widgets")
+			object := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "example.com/v1", "kind": "Widget", "metadata": map[string]any{"namespace": "ns1", "name": "widget"}}}
+			fc := fakecluster.New(t, fakecluster.WithAPIServer(), fakecluster.WithCRD(gvr, "Widget", true), fakecluster.WithObjects(object))
+			opts := []SimOption{SimNamespace("ns1"), SimView("widgets")}
+			if mode == "ro" {
+				opts = append(opts, SimReadOnly())
+			}
+			s := NewSimApp(t, fc, opts...)
+			v := topViewer(t, s)
+			s.Eventually(func() bool {
+				_, ok := v.Actions().Get(ui.KeyShiftE)
+				return ok
+			}, "loaded CRD did not bind resource events")
+			action, _ := v.Actions().Get(ui.KeyShiftE)
+			assert.Equal(t, "Events", action.Description)
+			assert.False(t, action.Opts.Dangerous)
+		})
 	}
 }
 
