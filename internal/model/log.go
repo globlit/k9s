@@ -53,7 +53,8 @@ type Log struct {
 	filter       string
 	flushTimeout time.Duration
 	// maxLines caps the buffer (logger.buffer). Zero uses the tail count.
-	maxLines int
+	maxLines      int
+	renderOptions dao.RenderOpts
 	// total counts appended lines; sent holds total at last flush. Both
 	// survive buffer rotation, so flushes never skip lines.
 	total, sent uint64
@@ -101,6 +102,7 @@ func (l *Log) IsHead() bool {
 func (l *Log) ToggleShowTimestamp(b bool) {
 	l.mx.Lock()
 	l.logOptions.ShowTimestamp = b
+	l.renderOptions.ShowTime = b
 	l.mx.Unlock()
 	l.Refresh()
 }
@@ -127,6 +129,8 @@ func (l *Log) Configure(opts config.Logger) {
 	l.logOptions.SinceSeconds = opts.SinceSeconds
 	l.logOptions.LogBufferSize = opts.LogBufferSize
 	l.maxLines = opts.BufferSize
+	l.renderOptions.JSON = opts.JSON
+	l.renderOptions.Fields = append([]string(nil), opts.JSONFields...)
 }
 
 // capacity returns the max buffered lines. Caller holds mx.
@@ -304,10 +308,11 @@ func (l *Log) Notify() {
 	l.sent = l.total
 	// Snapshot new items: render and filter off-lock.
 	batch := l.lines.Subset(index)
-	q, showTime := l.filter, l.logOptions.ShowTimestamp
+	q, opts := l.filter, l.renderOptions
+	opts.ShowTime = l.logOptions.ShowTimestamp
 	l.mx.Unlock()
 
-	l.fireBatch(batch, q, showTime)
+	l.fireBatch(batch, q, opts)
 }
 
 // ToggleAllContainers toggles to show all containers logs.
@@ -406,12 +411,12 @@ func (l *Log) snapshotListeners() []LogsListener {
 }
 
 // fireBatch renders and filters items, then notifies listeners.
-func (l *Log) fireBatch(items *dao.LogItems, q string, showTime bool) {
+func (l *Log) fireBatch(items *dao.LogItems, q string, opts dao.RenderOpts) {
 	var ll [][]byte
 	if q == "" {
-		ll = items.RenderFrom(0, showTime)
+		ll = items.RenderFrom(0, opts)
 	} else {
-		lines, matches, indices, err := items.FilterLines(0, q, showTime)
+		lines, matches, indices, err := items.FilterLines(0, q, opts)
 		if err != nil {
 			l.fireLogError(err)
 			return
@@ -447,11 +452,12 @@ func (l *Log) fireAll() {
 	l.mx.Lock()
 	l.sent = l.total
 	batch := l.lines.Subset(0)
-	q, showTime := l.filter, l.logOptions.ShowTimestamp
+	q, opts := l.filter, l.renderOptions
+	opts.ShowTime = l.logOptions.ShowTimestamp
 	l.mx.Unlock()
 
 	l.fireLogCleared()
-	l.fireBatch(batch, q, showTime)
+	l.fireBatch(batch, q, opts)
 }
 
 func (l *Log) fireLogResume() {
@@ -481,5 +487,24 @@ func (l *Log) fireLogChanged(lines [][]byte) {
 func (l *Log) fireLogCleared() {
 	for _, lis := range l.snapshotListeners() {
 		lis.LogCleared()
+	}
+}
+
+// SetJSON toggles structured rendering of the retained log buffer.
+func (l *Log) SetJSON(enabled bool) {
+	l.mx.Lock()
+	l.renderOptions.JSON = enabled
+	l.mx.Unlock()
+	l.Refresh()
+}
+
+// SetJSONPalette updates the colors used by subsequent renders.
+func (l *Log) SetJSONPalette(palette config.JSONLog) {
+	l.mx.Lock()
+	changed := l.renderOptions.Palette != palette
+	l.renderOptions.Palette = palette
+	l.mx.Unlock()
+	if changed {
+		l.Refresh()
 	}
 }

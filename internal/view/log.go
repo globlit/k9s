@@ -291,6 +291,7 @@ func (l *Log) BufferActive(state bool, k model.BufferKind) {
 
 // StylesChanged reports skin changes.
 func (l *Log) StylesChanged(s *config.Styles) {
+	l.model.SetJSONPalette(s.Views().Log.JSON)
 	l.SetBackgroundColor(s.Views().Log.BgColor.Color())
 	l.logs.SetTextColor(s.Views().Log.FgColor.Color())
 	l.logs.SetBackgroundColor(s.Views().Log.BgColor.Color())
@@ -369,6 +370,7 @@ func (l *Log) bindKeys() {
 		ui.KeyShiftL:    ui.NewKeyAction("Toggle ColumnLock", l.toggleColumnLockCmd, true),
 		ui.KeyF:         ui.NewKeyAction("Toggle FullScreen", l.toggleFullScreenCmd, true),
 		ui.KeyT:         ui.NewKeyAction("Toggle Timestamp", l.toggleTimestampCmd, true),
+		ui.KeyShiftJ:    ui.NewKeyAction("Toggle JSON", l.toggleJSONCmd, true),
 		ui.KeyW:         ui.NewKeyAction("Toggle Wrap", l.toggleTextWrapCmd, true),
 		tcell.KeyCtrlS:  ui.NewKeyAction("Save", l.SaveCmd, true),
 		ui.KeyC:         ui.NewKeyAction("Copy", cpCmd(l.app.Flash(), l.logs.TextView), true),
@@ -652,4 +654,10 @@ func (l *Log) toggleFullScreen() {
 
 func (l *Log) isContainerLogView() bool {
 	return l.model.HasDefaultContainer()
+}
+
+func (l *Log) toggleJSONCmd(*tcell.EventKey) *tcell.EventKey {
+	l.indicator.ToggleJSON()
+	l.model.SetJSON(l.indicator.JSON())
+	return nil
 }

@@ -146,7 +146,7 @@ func (l *LogItems) podColorFor(id string) string {
 }
 
 // renderLocked renders up to len(ll) items from index. Caller holds l.mx.
-func (l *LogItems) renderLocked(index int, showTime bool, ll [][]byte) {
+func (l *LogItems) renderLocked(index int, opts RenderOpts, ll [][]byte) {
 	if index < 0 || index > len(l.items) {
 		return
 	}
@@ -155,13 +155,13 @@ func (l *LogItems) renderLocked(index int, showTime bool, ll [][]byte) {
 			return
 		}
 		bb := bytes.NewBuffer(make([]byte, 0, item.Size()))
-		item.Render(l.podColorFor(item.ID()), showTime, bb)
+		item.Render(l.podColorFor(item.ID()), opts, bb)
 		ll[i] = bb.Bytes()
 	}
 }
 
 // RenderFrom renders lines from index. Size and render under one lock.
-func (l *LogItems) RenderFrom(index int, showTime bool) [][]byte {
+func (l *LogItems) RenderFrom(index int, opts RenderOpts) [][]byte {
 	l.mx.RLock()
 	defer l.mx.RUnlock()
 
@@ -169,22 +169,22 @@ func (l *LogItems) RenderFrom(index int, showTime bool) [][]byte {
 		return nil
 	}
 	ll := make([][]byte, len(l.items)-index)
-	l.renderLocked(index, showTime, ll)
+	l.renderLocked(index, opts, ll)
 
 	return ll
 }
 
 // Lines returns a collection of log lines.
-func (l *LogItems) Lines(index int, showTime bool, ll [][]byte) {
+func (l *LogItems) Lines(index int, opts RenderOpts, ll [][]byte) {
 	l.mx.RLock()
 	defer l.mx.RUnlock()
 
-	l.renderLocked(index, showTime, ll)
+	l.renderLocked(index, opts, ll)
 }
 
 // StrLines returns a collection of log lines.
-func (l *LogItems) StrLines(index int, showTime bool) []string {
-	ll := l.RenderFrom(index, showTime)
+func (l *LogItems) StrLines(index int, opts RenderOpts) []string {
+	ll := l.RenderFrom(index, opts)
 	ss := make([]string, len(ll))
 	for i, b := range ll {
 		ss[i] = string(b)
@@ -194,11 +194,11 @@ func (l *LogItems) StrLines(index int, showTime bool) []string {
 }
 
 // Render returns logs as a collection of strings.
-func (l *LogItems) Render(index int, showTime bool, ll [][]byte) {
+func (l *LogItems) Render(index int, opts RenderOpts, ll [][]byte) {
 	l.mx.RLock()
 	defer l.mx.RUnlock()
 
-	l.renderLocked(index, showTime, ll)
+	l.renderLocked(index, opts, ll)
 }
 
 // DumpDebug for debugging.
@@ -210,19 +210,41 @@ func (l *LogItems) DumpDebug(m string) {
 }
 
 // Filter filters out log items based on given filter.
-func (l *LogItems) Filter(index int, q string, showTime bool) (matches []int, indices [][]int, err error) {
-	_, matches, indices, err = l.FilterLines(index, q, showTime)
+func (l *LogItems) Filter(index int, q string, opts RenderOpts) (matches []int, indices [][]int, err error) {
+	_, matches, indices, err = l.FilterLines(index, q, opts)
 
 	return
 }
 
 // FilterLines filters items from index and returns matched rendered lines.
 // Callers never index into a moved buffer.
-func (l *LogItems) FilterLines(index int, q string, showTime bool) (lines [][]byte, matches []int, indices [][]int, err error) {
+func (l *LogItems) FilterLines(index int, q string, opts RenderOpts) (lines [][]byte, matches []int, indices [][]int, err error) {
 	if q == "" {
 		return
 	}
-	lines = l.RenderFrom(index, showTime)
+	if selector, ok := internal.IsJSONSelector(q); ok {
+		predicates, parseErr := parseJSONSelector(selector)
+		if parseErr != nil {
+			err = parseErr
+			return
+		}
+		l.mx.RLock()
+		defer l.mx.RUnlock()
+		if index < 0 || index > len(l.items) {
+			return
+		}
+		lines = make([][]byte, len(l.items)-index)
+		l.renderLocked(index, opts, lines)
+		matches, indices = make([]int, 0), make([][]int, 0)
+		for i, item := range l.items[index:] {
+			if matchesJSON(item.parsedJSON(), predicates) {
+				matches = append(matches, i)
+				indices = append(indices, nil)
+			}
+		}
+		return
+	}
+	lines = l.RenderFrom(index, opts)
 	if f, ok := internal.IsFuzzySelector(q); ok {
 		matches, indices = fuzzyFilter(lines, f)
 		return

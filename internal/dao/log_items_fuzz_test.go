@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 	"unicode/utf8"
+
+	"github.com/globlit/tview"
 )
 
 func FuzzLogItemRender(f *testing.F) {
@@ -38,12 +40,13 @@ func FuzzLogItemRender(f *testing.F) {
 		l.IsEmpty()
 
 		var out bytes.Buffer
-		l.Render("teal", showTime, &out)
+		l.Render("teal", RenderOpts{ShowTime: showTime}, &out)
 
 		msg := bb
 		if i := bytes.IndexByte(bb, ' '); i > 0 {
 			msg = bb[i+1:]
 		}
+		msg = tview.EscapeBytes(msg)
 		if !bytes.HasSuffix(out.Bytes(), msg) {
 			t.Fatalf("output %q does not end with %q", out.Bytes(), msg)
 		}
@@ -87,7 +90,7 @@ func FuzzLogItemsFilter(f *testing.F) {
 				err     error
 			)
 			runWithin(t, 2*time.Second, func() {
-				lines, matches, indices, err = ii.FilterLines(index, q, showTime)
+				lines, matches, indices, err = ii.FilterLines(index, q, RenderOpts{ShowTime: showTime})
 			})
 			if err != nil {
 				continue
@@ -105,7 +108,7 @@ func FuzzLogItemsFilter(f *testing.F) {
 					}
 				}
 			}
-			ii.Filter(index, q, showTime)
+			ii.Filter(index, q, RenderOpts{ShowTime: showTime})
 		}
 	})
 }

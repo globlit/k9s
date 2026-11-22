@@ -23,6 +23,7 @@ type LogIndicator struct {
 	fullScreen                 bool
 	textWrap                   bool
 	showTime                   bool
+	json                       bool
 	allContainers              bool
 	shouldDisplayAllContainers bool
 	columnLock                 bool
@@ -38,6 +39,7 @@ func NewLogIndicator(cfg *config.Config, styles *config.Styles, allContainers bo
 		fullScreen:                 cfg.K9s.UI.DefaultsToFullScreen,
 		textWrap:                   cfg.K9s.Logger.TextWrap,
 		showTime:                   cfg.K9s.Logger.ShowTime,
+		json:                       cfg.K9s.Logger.JSON,
 		shouldDisplayAllContainers: allContainers,
 		columnLock:                 cfg.K9s.Logger.ColumnLock,
 	}
@@ -171,6 +173,12 @@ func (l *LogIndicator) Refresh() {
 		l.indicator = append(l.indicator, fmt.Sprintf(toggleOffFmt, "Timestamps", spacer)...)
 	}
 
+	if l.JSON() {
+		l.indicator = append(l.indicator, fmt.Sprintf(toggleOnFmt, "JSON", spacer)...)
+	} else {
+		l.indicator = append(l.indicator, fmt.Sprintf(toggleOffFmt, "JSON", spacer)...)
+	}
+
 	if l.TextWrap() {
 		l.indicator = append(l.indicator, fmt.Sprintf(toggleOnFmt, "Wrap", "")...)
 	} else {
@@ -178,4 +186,13 @@ func (l *LogIndicator) Refresh() {
 	}
 
 	_, _ = l.Write(l.indicator)
+}
+
+// JSON reports whether structured log rendering is enabled.
+func (l *LogIndicator) JSON() bool { return l.json }
+
+// ToggleJSON changes the structured log rendering indicator.
+func (l *LogIndicator) ToggleJSON() {
+	l.json = !l.json
+	l.Refresh()
 }

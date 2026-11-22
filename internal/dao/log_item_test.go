@@ -10,7 +10,6 @@ import (
 
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/dao"
-	"github.com/globlit/tview"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -94,12 +93,12 @@ func TestLogItemRender(t *testing.T) {
 	for k := range uu {
 		u := uu[k]
 		t.Run(k, func(t *testing.T) {
-			i := dao.NewLogItem([]byte(tview.Escape(u.log)))
+			i := dao.NewLogItem([]byte(u.log))
 			_, n := client.Namespaced(u.opts.Path)
 			i.Pod, i.Container = n, u.opts.Container
 
 			bb := bytes.NewBuffer(make([]byte, 0, i.Size()))
-			i.Render("yellow", u.opts.ShowTimestamp, bb)
+			i.Render("yellow", dao.RenderOpts{ShowTime: u.opts.ShowTimestamp}, bb)
 			assert.Equal(t, u.e, bb.String())
 		})
 	}
@@ -114,7 +113,7 @@ func BenchmarkLogItemRenderTS(b *testing.B) {
 	b.ReportAllocs()
 	for range b.N {
 		bb := bytes.NewBuffer(make([]byte, 0, i.Size()))
-		i.Render("yellow", true, bb)
+		i.Render("yellow", dao.RenderOpts{ShowTime: true}, bb)
 	}
 }
 
@@ -127,6 +126,6 @@ func BenchmarkLogItemRenderNoTS(b *testing.B) {
 	b.ReportAllocs()
 	for range b.N {
 		bb := bytes.NewBuffer(make([]byte, 0, i.Size()))
-		i.Render("yellow", false, bb)
+		i.Render("yellow", dao.RenderOpts{ShowTime: false}, bb)
 	}
 }

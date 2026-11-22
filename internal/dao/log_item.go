@@ -5,6 +5,10 @@ package dao
 
 import (
 	"bytes"
+	"strings"
+	"sync"
+
+	"github.com/globlit/tview"
 )
 
 // LogChan represents a channel for logs.
@@ -18,6 +22,10 @@ type LogItem struct {
 	SingleContainer bool
 	Bytes           []byte
 	IsError         bool
+	// Log items are immutable after publication to the stream.
+	jsonOnce   sync.Once
+	jsonFields map[string]any
+	jsonKeys   []string
 }
 
 // NewLogItem returns a new item.
@@ -67,11 +75,14 @@ func (l *LogItem) Size() int {
 }
 
 // Render returns a log line as string.
-func (l *LogItem) Render(paint string, showTime bool, bb *bytes.Buffer) {
+func (l *LogItem) Render(paint string, opts RenderOpts, bb *bytes.Buffer) {
 	index := bytes.Index(l.Bytes, []byte{' '})
-	if showTime && index > 0 {
+	if opts.JSON && bytes.HasPrefix(bytes.TrimSpace(l.Bytes), []byte{'{'}) && l.parsedJSON() != nil {
+		index = -1
+	}
+	if opts.ShowTime && index > 0 {
 		bb.WriteString("[gray::b]")
-		bb.Write(l.Bytes[:index])
+		bb.Write(escapeLogBytes(l.Bytes[:index]))
 		bb.WriteString(" ")
 		if l := 30 - len(l.Bytes[:index]); l > 0 {
 			bb.Write(bytes.Repeat([]byte{' '}, l))
@@ -80,21 +91,42 @@ func (l *LogItem) Render(paint string, showTime bool, bb *bytes.Buffer) {
 	}
 
 	if l.Pod != "" {
-		bb.WriteString("[" + paint + "::]" + l.Pod)
+		bb.WriteString("[" + paint + "::]" + escapeLogText(l.Pod))
 	}
 
 	if !l.SingleContainer && l.Container != "" {
 		if l.Pod != "" {
 			bb.WriteString(" ")
 		}
-		bb.WriteString("[" + paint + "::b]" + l.Container + "[-::-] ")
+		bb.WriteString("[" + paint + "::b]" + escapeLogText(l.Container) + "[-::-] ")
 	} else if l.Pod != "" {
 		bb.WriteString("[-::] ")
 	}
 
-	if index > 0 {
-		bb.Write(l.Bytes[index+1:])
-	} else {
-		bb.Write(l.Bytes)
+	if opts.JSON && !l.IsError && l.renderJSON(opts, bb) {
+		return
 	}
+	payload := l.Bytes
+	if index > 0 {
+		payload = payload[index+1:]
+	}
+	if !l.IsError {
+		payload = escapeLogBytes(payload)
+	}
+	bb.Write(payload)
+}
+
+// Avoid the regexp allocation in tview's escape functions for ordinary logs.
+func escapeLogBytes(text []byte) []byte {
+	if bytes.IndexByte(text, '[') < 0 {
+		return text
+	}
+	return tview.EscapeBytes(text)
+}
+
+func escapeLogText(text string) string {
+	if !strings.ContainsRune(text, '[') {
+		return text
+	}
+	return tview.Escape(text)
 }

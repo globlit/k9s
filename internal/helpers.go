@@ -43,3 +43,14 @@ func IsFuzzySelector(s string) (string, bool) {
 
 	return mm[1], true
 }
+
+// IsJSONSelector identifies an exact-field log selector.
+func IsJSONSelector(s string) (string, bool) {
+	if s == "-j" {
+		return "", true
+	}
+	if strings.HasPrefix(s, "-j ") {
+		return strings.TrimSpace(s[3:]), true
+	}
+	return "", false
+}
