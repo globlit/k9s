@@ -28,12 +28,13 @@ var imageFamilies = map[string]struct {
 	gvr      *client.GVR
 	res      string
 	template bool
+	kind     string
 	new      func() imageSetter
 }{
-	"dp":  {gvr: client.DpGVR, res: "deployments", template: true, new: func() imageSetter { return new(Deployment) }},
-	"ds":  {gvr: client.DsGVR, res: "daemonsets", template: true, new: func() imageSetter { return new(DaemonSet) }},
-	"sts": {gvr: client.StsGVR, res: "statefulsets", template: true, new: func() imageSetter { return new(StatefulSet) }},
-	"pod": {gvr: client.PodGVR, res: "pods", new: func() imageSetter { return new(Pod) }},
+	"dp":  {gvr: client.DpGVR, res: "deployments", template: true, kind: "deployment", new: func() imageSetter { return new(Deployment) }},
+	"ds":  {gvr: client.DsGVR, res: "daemonsets", template: true, kind: "daemonset", new: func() imageSetter { return new(DaemonSet) }},
+	"sts": {gvr: client.StsGVR, res: "statefulsets", template: true, kind: "statefulset", new: func() imageSetter { return new(StatefulSet) }},
+	"pod": {gvr: client.PodGVR, res: "pods", kind: "pod", new: func() imageSetter { return new(Pod) }},
 }
 
 func mutImageObjects(owned bool) []runtime.Object {
@@ -112,6 +113,9 @@ func TestSetImagesErrors(t *testing.T) {
 
 				err := s.SetImages(context.Background(), u.path, ImageSpecs{{Name: "c1", DockerImage: "x"}})
 				require.ErrorContains(t, err, u.err)
+				if k == "deny" {
+					require.EqualError(t, err, "user is not authorized to patch a "+fam.kind)
+				}
 			})
 		}
 	}

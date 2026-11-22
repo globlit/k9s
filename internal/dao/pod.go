@@ -560,7 +560,7 @@ func (p *Pod) SetImages(ctx context.Context, path string, imageSpecs ImageSpecs)
 		return err
 	}
 	if !auth {
-		return fmt.Errorf("user is not authorized to patch a deployment")
+		return fmt.Errorf("user is not authorized to patch a pod")
 	}
 	manager, isManaged, err := p.isControlled(path)
 	if err != nil {
