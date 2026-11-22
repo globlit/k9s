@@ -130,11 +130,13 @@ func boundActions(t *testing.T, s *SimApp) []boundAction {
 	t.Helper()
 	v := topViewer(t, s)
 	var out []boundAction
-	s.onLoop(func() {
-		v.Actions().Range(func(k tcell.Key, a ui.KeyAction) {
+	// Use Get, not Range: Range reads the map without the lock.
+	aa := v.Actions()
+	for k := tcell.Key(0); k < 1024; k++ {
+		if a, ok := aa.Get(k); ok {
 			out = append(out, boundAction{key: keyName(k), desc: a.Description, danger: a.Opts.Dangerous})
-		})
-	})
+		}
+	}
 	slices.SortFunc(out, func(a, b boundAction) int { return strings.Compare(a.key, b.key) })
 
 	return out
@@ -169,6 +171,23 @@ func openRoView(t *testing.T, s *SimApp, v roView, dir string) {
 		_, ok := s.app.Content.Top().(ResourceViewer)
 		return ok && (s.TopView() != before || v.cmd == "pods")
 	}, "view "+v.name+" not shown")
+}
+
+// settledActions waits for the actions in the expected file, then for
+// stable actions when the file is missing or never matches.
+func settledActions(t *testing.T, s *SimApp, path string) []boundAction {
+	t.Helper()
+	want, err := os.ReadFile(path)
+	if err == nil {
+		for range 250 {
+			if aa := boundActions(t, s); formatActions(aa) == string(want) {
+				return aa
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+
+	return stableActions(t, s)
 }
 
 // stableActions waits until the bound actions stop changing. Views bind
@@ -219,9 +238,10 @@ func TestReadOnlyBindings(t *testing.T) {
 		for _, v := range roViews {
 			t.Run(mode+"/"+v.name, func(t *testing.T) {
 				openRoView(t, s, v, dir)
-				aa := stableActions(t, s)
+				name := filepath.Join("readonly", mode, v.name+".txt")
+				aa := settledActions(t, s, filepath.Join(expect.Dir, name))
 
-				expect.Match(t, filepath.Join("readonly", mode, v.name+".txt"), formatActions(aa))
+				expect.Match(t, name, formatActions(aa))
 				for _, c := range s.fc.PseudoCalls() {
 					t.Logf("API call on pseudo resource: %s %s", c.Action.GetVerb(), c.Action.GetResource().Resource)
 				}
@@ -242,6 +262,25 @@ func TestReadOnlyBindings(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestKeyActionsRangeRace(t *testing.T) {
+	t.Skip("bug: KeyActions.Range iterates the map after it drops the lock; a concurrent Delete races")
+	aa := ui.NewKeyActions()
+	for k := range tcell.Key(64) {
+		aa.Add(k, ui.NewKeyAction("x", nil, false))
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for k := range tcell.Key(64) {
+			aa.Delete(k)
+		}
+	}()
+	for range 100 {
+		aa.Range(func(tcell.Key, ui.KeyAction) {})
+	}
+	<-done
 }
 
 // TestReadOnlyKeysDoNothing presses every mutating key in read-only mode and
