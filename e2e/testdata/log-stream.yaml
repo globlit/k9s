@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: log-stream
+spec:
+  terminationGracePeriodSeconds: 1
+  containers:
+    - name: stream
+      image: busybox:1.36.1
+      command:
+        - sh
+        - -c
+        - |
+          payload=$(printf '%01000d' 0)
+          i=0
+          while true; do
+            j=0
+            while [ "$j" -lt 1000 ]; do
+              printf 'stream-line-%08d %s\n' "$i" "$payload"
+              i=$((i + 1))
+              j=$((j + 1))
+            done
+            sleep 1
+          done
+      resources:
+        requests:
+          cpu: 10m
+          memory: 4Mi
+        limits:
+          cpu: 200m
+          memory: 32Mi
