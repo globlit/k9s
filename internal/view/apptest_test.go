@@ -260,7 +260,23 @@ func (s *SimApp) Eventually(fn func() bool, msg string) {
 }
 
 // Screen returns the screen text, one line per row, right spaces trimmed.
+// It reads the cells on the event loop, which also draws them.
 func (s *SimApp) Screen() string {
+	var (
+		scr  string
+		done bool
+	)
+	if !s.Stopped() {
+		s.onLoop(func() { scr, done = s.screen(), true })
+	}
+	if !done {
+		scr = s.screen()
+	}
+
+	return scr
+}
+
+func (s *SimApp) screen() string {
 	cells, w, h := s.scr.GetContents()
 	var b strings.Builder
 	for y := range h {

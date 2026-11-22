@@ -4,13 +4,16 @@
 package view
 
 import (
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/globlit/k9s/internal/client"
+	"github.com/globlit/k9s/internal/testutil/expect"
 	"github.com/globlit/k9s/internal/testutil/fakecluster"
+	"github.com/globlit/tcell/v2"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -19,7 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-var e2eCRD = client.NewGVR("e2e.k9s.io/v1/widgets")
+// e2eDebounce is longer than the command buffer key entry delay.
+const e2eDebounce = 250 * time.Millisecond
 
 // e2eAge returns a creation time d ago. Ages in days render the same all day.
 func e2eAge(days int) metav1.Time {
@@ -180,4 +184,32 @@ func (s *SimApp) e2eGone(ss ...string) {
 		}
 		return true
 	}, "screen still shows "+strings.Join(ss, ", "))
+}
+
+// e2eMatch waits for the screen to show testdata/expected/name, then
+// compares it. The wait skips short redraw states.
+func (s *SimApp) e2eMatch(name string) {
+	s.t.Helper()
+	want, err := os.ReadFile(filepath.Join(expect.Dir, name))
+	deadline := time.Now().Add(simTimeout)
+	got := e2eMask(s.Screen())
+	for err == nil && got != string(want) && time.Now().Before(deadline) {
+		s.Sync()
+		got = e2eMask(s.Screen())
+	}
+	expect.Match(s.t, name, got)
+}
+
+// e2eSettle waits until the command buffer debounce has run.
+func (s *SimApp) e2eSettle() {
+	s.t.Helper()
+	t0 := time.Now()
+	s.Eventually(func() bool { return time.Since(t0) > e2eDebounce }, "settle")
+}
+
+// e2eFilter types a filter, presses Enter and waits for the debounce.
+func (s *SimApp) e2eFilter(f string) {
+	s.t.Helper()
+	s.Keys('/', f, tcell.KeyEnter)
+	s.e2eSettle()
 }

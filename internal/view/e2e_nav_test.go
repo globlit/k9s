@@ -11,7 +11,6 @@ import (
 
 	"github.com/globlit/k9s/internal/client"
 	"github.com/globlit/k9s/internal/dao"
-	"github.com/globlit/k9s/internal/testutil/expect"
 	"github.com/globlit/k9s/internal/testutil/fakecluster"
 	"github.com/globlit/tcell/v2"
 	"github.com/stretchr/testify/assert"
@@ -45,7 +44,7 @@ func TestE2EStartup(t *testing.T) {
 	assert.Contains(t, scr, "Cluster: fake")
 	assert.Contains(t, scr, "K8s Rev: v1.37.2")
 	assert.Equal(t, "<pod>", s.e2eCrumbs())
-	expect.Match(t, "e2e_startup.txt", e2eMask(scr))
+	s.e2eMatch("e2e_startup.txt")
 }
 
 func TestE2ENavigation(t *testing.T) {
@@ -92,7 +91,7 @@ func TestE2EDrillDown(t *testing.T) {
 	s.e2eWait("web-7d9-aaaaa", "web-7d9-bbbbb")
 	s.e2eGone("api-0", "db-0")
 	assert.Equal(t, "<deployment> <pod>", s.e2eCrumbs())
-	expect.Match(t, "e2e_deploy_pods.txt", e2eMask(s.Screen()))
+	s.e2eMatch("e2e_deploy_pods.txt")
 
 	s.Keys(tcell.KeyEscape)
 	s.Eventually(func() bool { return s.TopView() == "Deployment" }, "esc did not go back")
@@ -134,7 +133,7 @@ func TestE2EUnknownCommand(t *testing.T) {
 	s.Cmd(":bogus")
 	s.e2eWait("`bogus` command not found")
 	assert.Equal(t, "Pod", s.TopView())
-	expect.Match(t, "e2e_unknown_cmd.txt", e2eMask(s.Screen()))
+	s.e2eMatch("e2e_unknown_cmd.txt")
 }
 
 // e2eViewNames maps viewers whose top view name is not their meta kind.

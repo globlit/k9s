@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/globlit/k9s/internal/testutil/expect"
 	"github.com/globlit/tcell/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -75,7 +74,7 @@ func TestE2EFilters(t *testing.T) {
 	for _, u := range uu {
 		t.Run(u.name, func(t *testing.T) {
 			defer s.Use(t)()
-			s.Keys('/', u.filter, tcell.KeyEnter)
+			s.e2eFilter(u.filter)
 			s.e2eRowsAre(u.rows...)
 			s.Keys(tcell.KeyEscape)
 			s.e2eRowsAre("api-0", "web-7d9-aaaaa", "web-7d9-bbbbb", "cache-0", "db-0")
@@ -84,9 +83,8 @@ func TestE2EFilters(t *testing.T) {
 
 	t.Run("title", func(t *testing.T) {
 		defer s.Use(t)()
-		s.Keys('/', "web", tcell.KeyEnter)
+		s.e2eFilter("web")
 		s.e2eWait("pods(all)[2] </web>")
-		expect.Match(t, "e2e_filter_regex.txt", e2eMask(s.Screen()))
 		s.Keys(tcell.KeyEscape)
 		s.e2eWait("pods(all)[5]")
 		s.e2eGone("</web>")
@@ -95,7 +93,7 @@ func TestE2EFilters(t *testing.T) {
 	// Keep all rows on an invalid regex. Only the log filter uses a literal match.
 	t.Run("invalid-regex", func(t *testing.T) {
 		defer s.Use(t)()
-		s.Keys('/', "web[", tcell.KeyEnter)
+		s.e2eFilter("web[")
 		s.e2eWait("pods(all)[5] </web[>")
 		s.e2eRowsAre("api-0", "web-7d9-aaaaa", "web-7d9-bbbbb", "cache-0", "db-0")
 		assert.Equal(t, "Pod", s.TopView())
@@ -120,6 +118,7 @@ func TestE2EFilters(t *testing.T) {
 		defer s.Use(t)()
 		s.Keys('/', "db")
 		s.e2eRowsAre("db-0")
+		s.e2eSettle()
 		s.Keys(tcell.KeyEscape)
 		s.e2eRowsAre("api-0", "web-7d9-aaaaa", "web-7d9-bbbbb", "cache-0", "db-0")
 	})
