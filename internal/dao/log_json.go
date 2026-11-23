@@ -138,7 +138,7 @@ func (l *LogItem) renderJSON(opts RenderOpts, out *bytes.Buffer) bool {
 		if shown > 0 {
 			out.WriteByte(' ')
 		}
-		fmt.Fprintf(out, "[%s::d]…+%d[-::-]", palette.Key, hidden)
+		out.WriteString("[" + palette.Key.String() + "::d]…+" + strconv.Itoa(hidden) + "[-::-]")
 	} else if len(fields) == 0 {
 		out.WriteString("{}")
 	}
