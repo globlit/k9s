@@ -1,9 +1,9 @@
- Context: fake [RW]                                <a>       Attach       <ctrl-k>  Kill            <o> Show Node                      ____  __ ________
- Cluster: fake                                     <ctrl-d>  Delete       <l>       Logs            <f> Show PortForward              |    |/  /   __   \______
- User:    fake                                     <d>       Describe     <p>       Logs Previous   <t> Transfer                      |       /\____    /  ___/
- K9s Rev: v0.0.0                                   <e>       Edit         <shift-f> Port-Forward    <y> YAML                          |    \   \  /    /\___  \
- K8s Rev: v1.37.2                                  <?>       Help         <z>       Sanitize                                          |____|\__ \/____//____  /
- CPU:     n/a                                      <shift-j> Jump Owner   <s>       Shell                                                      \/           \/
+ Context: fake [RW]                      <a>       Attach     <?>       Help            <z> Sanitize
+ Cluster: fake                           <shift-d> Debug      <shift-j> Jump Owner      <s> Shell
+ User:    fake                           <ctrl-d>  Delete     <ctrl-k>  Kill            <o> Show Node
+ K9s Rev: v0.0.0                         <d>       Describe   <l>       Logs            <f> Show PortForward
+ K8s Rev: v1.37.2                        <e>       Edit       <p>       Logs Previous   <t> Transfer
+ CPU:     n/a                            <shift-e> Events     <shift-f> Port-Forward    <y> YAML
  MEM:     n/a
 ┌──────────────────────────────────────────────────────────────── pods(ns-a/web)[2] </app=web> ────────────────────────────────────────────────────────────────┐
 │ NAME↑                     PF            READY            STATUS                         RESTARTS IP                    NODE                AGE               │
@@ -46,4 +46,4 @@
 │                                                                                                                                                              │
 │                                                                                                                                                              │
 └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-  <deployment>   <pod>
+  <deployment>   <pod>                                                                                                                                     <K9s>

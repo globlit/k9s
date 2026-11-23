@@ -1,9 +1,9 @@
- Context: fake [RW]                                <space> Expand/Collapse                                                             ____  __ ________
- Cluster: fake                                     <x>     Expand/Collapse All                                                        |    |/  /   __   \______
- User:    fake                                     <enter> Goto                                                                       |       /\____    /  ___/
- K9s Rev: v0.0.0                                                                                                                      |    \   \  /    /\___  \
- K8s Rev: v1.37.2                                                                                                                     |____|\__ \/____//____  /
- CPU:     n/a                                                                                                                                  \/           \/
+ Context: fake [RW]                      <space> Expand/Collapse
+ Cluster: fake                           <x>     Expand/Collapse All
+ User:    fake                           <enter> Goto
+ K9s Rev: v0.0.0
+ K8s Rev: v1.37.2
+ CPU:     n/a
  MEM:     n/a
 ┌───────────────────────────────────────────────────────────────── Xray-Deployments(ns-a)[2] ──────────────────────────────────────────────────────────────────┐
 │ 🪂  deployments(1)                                                                                                                                            │

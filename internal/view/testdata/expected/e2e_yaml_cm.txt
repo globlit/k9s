@@ -1,9 +1,9 @@
- Context: fake [RW]                                <c>       Copy                  <f> Toggle FullScreen                               ____  __ ________
- Cluster: fake                                     <e>       Edit                  <m> Toggle ManagedFields                           |    |/  /   __   \______
- User:    fake                                     <n>       Next Match                                                               |       /\____    /  ___/
- K9s Rev: v0.0.0                                   <shift-n> Prev Match                                                               |    \   \  /    /\___  \
- K8s Rev: v1.37.2                                  <r>       Toggle Auto-Refresh                                                      |____|\__ \/____//____  /
- CPU:     n/a                                      <x>       Toggle Decode                                                                     \/           \/
+ Context: fake [RW]                      <c>       Copy                  <f> Toggle FullScreen
+ Cluster: fake                           <e>       Edit                  <m> Toggle ManagedFields
+ User:    fake                           <n>       Next Match
+ K9s Rev: v0.0.0                         <shift-n> Prev Match
+ K8s Rev: v1.37.2                        <r>       Toggle Auto-Refresh
+ CPU:     n/a                            <x>       Toggle Decode
  MEM:     n/a
 ┌───────────────────────────────────────────────────────────────────── YAML(ns-a/web-cfg) ─────────────────────────────────────────────────────────────────────┐
 │ apiVersion: v1                                                                                                                                               │
@@ -46,4 +46,4 @@
 │                                                                                                                                                              │
 │                                                                                                                                                              │
 └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-  <configmap>   <yaml>
+  <configmap>   <yaml>                                                                                                                                     <K9s>

@@ -1,12 +1,12 @@
- Context: fake [RW]                                <0> tail   <6> 1h   <shift-c> Clear               <f> Toggle FullScreen             ____  __ ________
- Cluster: fake                                     <1> head            <c>       Copy                <t> Toggle Timestamp             |    |/  /   __   \______
- User:    fake                                     <2> 1m              <m>       Mark                <w> Toggle Wrap                  |       /\____    /  ___/
- K9s Rev: v0.0.0                                   <3> 5m              <ctrl-s>  Save                                                 |    \   \  /    /\___  \
- K8s Rev: v1.37.2                                  <4> 15m             <s>       Toggle AutoScroll                                    |____|\__ \/____//____  /
- CPU:     n/a                                      <5> 30m             <shift-l> Toggle ColumnLock                                             \/           \/
+ Context: fake [RW]                      <0> tail   <6> 1h   <shift-c> Clear               <f>       Toggle FullScreen
+ Cluster: fake                           <1> head            <c>       Copy                <shift-j> Toggle JSON
+ User:    fake                           <2> 1m              <m>       Mark                <t>       Toggle Timestamp
+ K9s Rev: v0.0.0                         <3> 5m              <ctrl-s>  Save                <w>       Toggle Wrap
+ K8s Rev: v1.37.2                        <4> 15m             <s>       Toggle AutoScroll
+ CPU:     n/a                            <5> 30m             <shift-l> Toggle ColumnLock
  MEM:     n/a
 ┌──────────────────────────────────────────────────────────────── Logs(ns-a/api-0:main)[tail] ─────────────────────────────────────────────────────────────────┐
-│                                     Autoscroll:On      ColumnLock:Off     FullScreen:Off     Timestamps:Off     Wrap:Off                                     │
+│                              Autoscroll:On      ColumnLock:Off     FullScreen:Off     Timestamps:Off     JSON:Off     Wrap:Off                               │
 │ INFO ns-a/main line-0 [x]                                                                                                                                    │
 │ WARN ns-a/main line-1 [x]                                                                                                                                    │
 │ ERROR ns-a/main line-2 [x]                                                                                                                                   │
@@ -46,4 +46,4 @@
 │                                                                                                                                                              │
 │                                                                                                                                                              │
 └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-  <pod>   <logs>
+  <pod>   <logs>                                                                                                                                           <K9s>

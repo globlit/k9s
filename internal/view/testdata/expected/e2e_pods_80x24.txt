@@ -1,9 +1,9 @@
- Context: fake [RW]                                <0… ____  __ ________
- Cluster: fake                                     <1>|    |/  /   __   \______
- User:    fake                                        |       /\____    /  ___/
- K9s Rev: v0.0.0                                      |    \   \  /    /\___  \
- K8s Rev: v1.37.2                                     |____|\__ \/____//____  /
- CPU:     n/a                                                  \/           \/
+ Context: fake [RW]                      <0> all       <a>       Attach     <?>…
+ Cluster: fake                           <1> default   <shift-d> Debug      <shi
+ User:    fake                                         <ctrl-d>  Delete     <ctr
+ K9s Rev: v0.0.0                                       <d>       Describe   <l>
+ K8s Rev: v1.37.2                                      <e>       Edit       <p>
+ CPU:     n/a                                          <shift-e> Events     <shi
  MEM:     n/a
 ┌──────────────────────────────── pods(all)[5] ────────────────────────────────┐
 │ NAMESPACE↑  NAME           PF READY STATUS   RESTARTS IP        NODE    AGE  │
@@ -20,4 +20,4 @@
 │                                                                              │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
-  <pod>
+  <pod>                                                                    <K9s>

@@ -1,9 +1,9 @@
- Context: fake [RW]                                <esc> Back                                                                          ____  __ ________
- Cluster: fake                                                                                                                        |    |/  /   __   \______
- User:    fake                                                                                                                        |       /\____    /  ___/
- K9s Rev: v0.0.0                                                                                                                      |    \   \  /    /\___  \
- K8s Rev: v1.37.2                                                                                                                     |____|\__ \/____//____  /
- CPU:     n/a                                                                                                                                  \/           \/
+ Context: fake [RW]                      <esc> Back
+ Cluster: fake
+ User:    fake
+ K9s Rev: v0.0.0
+ K8s Rev: v1.37.2
+ CPU:     n/a
  MEM:     n/a
 ┌──────────────────────────────────────────────────────────────────────────── Help ────────────────────────────────────────────────────────────────────────────┐
 │ RESOURCE                                   GENERAL                                          NAVIGATION                               HOTKEYS                 │
@@ -12,20 +12,22 @@
 │ <a>             Attach                     <esc>               Back/Clear                   <g>              Goto Top                                        │
 │ <c>             Copy                       <ctrl-u>            Command Clear                <[>              History Back                                    │
 │ <n>             Copy Namespace             <:cmd>              Command mode                 <]>              History Forward                                 │
-│ <ctrl-d>        Delete                     <tab>               Field Next                   <->              Last Used Command                               │
-│ <d>             Describe                   <backtab>           Field Previous               <h>              Left                                            │
-│ <e>             Edit                       </term>             Filter mode                  <ctrl-f>         Page Down                                       │
-│ <?>             Help                       <?>                 Help                         <ctrl-b>         Page Up                                         │
-│ <shift-j>       Jump Owner                 <space>             Mark                         <l>              Right                                           │
-│ <ctrl-k>        Kill                       <ctrl-\>            Mark Clear                   <k>              Up                                              │
-│ <l>             Logs                       <ctrl-space>        Mark Range                                                                                    │
-│ <p>             Logs Previous              <:q>                Quit                                                                                          │
-│ <shift-f>       Port-Forward               <ctrl-r>            Reload                                                                                        │
-│ <ctrl-r>        Refresh                    <ctrl-s>            Save                                                                                          │
-│ <z>             Sanitize                   <shift-right>       Select Next Column                                                                            │
-│ <i>             Set Image                  <shift-left>        Select Previous Column                                                                        │
-│ <s>             Shell                      <ctrl-g>            Toggle Crumbs                                                                                 │
-│ <o>             Show Node                  <ctrl-e>            Toggle Header                                                                                 │
+│ <shift-d>       Debug                      <tab>               Field Next                   <->              Last Used Command                               │
+│ <ctrl-d>        Delete                     <backtab>           Field Previous               <h>              Left                                            │
+│ <d>             Describe                   </term>             Filter mode                  <ctrl-f>         Page Down                                       │
+│ <e>             Edit                       <?>                 Help                         <ctrl-b>         Page Up                                         │
+│ <shift-e>       Events                     <space>             Mark                         <l>              Right                                           │
+│ <?>             Help                       <ctrl-\>            Mark Clear                   <k>              Up                                              │
+│ <shift-j>       Jump Owner                 <ctrl-space>        Mark Range                                                                                    │
+│ <ctrl-k>        Kill                       <:q>                Quit                                                                                          │
+│ <l>             Logs                       <ctrl-r>            Reload                                                                                        │
+│ <p>             Logs Previous              <ctrl-s>            Save                                                                                          │
+│ <shift-f>       Port-Forward               <shift-right>       Select Next Column                                                                            │
+│ <ctrl-r>        Refresh                    <shift-left>        Select Previous Column                                                                        │
+│ <z>             Sanitize                   <ctrl-g>            Toggle Crumbs                                                                                 │
+│ <i>             Set Image                  <ctrl-e>            Toggle Header                                                                                 │
+│ <s>             Shell                                                                                                                                        │
+│ <o>             Show Node                                                                                                                                    │
 │ <f>             Show PortForward                                                                                                                             │
 │ <shift-a>       Sort Age                                                                                                                                     │
 │ <shift-n>       Sort Name                                                                                                                                    │
@@ -43,7 +45,5 @@
 │                                                                                                                                                              │
 │                                                                                                                                                              │
 │                                                                                                                                                              │
-│                                                                                                                                                              │
-│                                                                                                                                                              │
 └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-  <pod>   <help>
+  <pod>   <help>                                                                                                                                           <K9s>

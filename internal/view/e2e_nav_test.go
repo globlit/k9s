@@ -19,10 +19,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// e2eCrumbs returns the crumbs row.
+// e2eCrumbs returns the rendered text inside the breadcrumb widget.
 func (s *SimApp) e2eCrumbs() string {
-	_, h := s.scr.Size()
-	return strings.Join(strings.Fields(s.Row(h-2)), " ")
+	var text strings.Builder
+	s.onLoop(func() {
+		x, y, width, _ := s.app.Crumbs().GetRect()
+		for col := x; col < x+width; col++ {
+			r, _, _, _ := s.scr.GetContent(col, y)
+			text.WriteRune(r)
+		}
+	})
+
+	return strings.Join(strings.Fields(text.String()), " ")
 }
 
 func (s *SimApp) e2eGoto(cmd, view string, shows ...string) {
