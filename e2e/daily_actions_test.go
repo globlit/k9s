@@ -23,7 +23,7 @@ func TestDailyBulkPauseDeployments(t *testing.T) {
 	h.Kubectl("patch", "deployment/daily-a", "-n", h.NS, "--type=merge", "-p", `{"spec":{"paused":true}}`)
 	h.Start("-c", "deploy")
 	h.WaitFor(" daily-c ", 30*time.Second)
-	h.SendKeys("C-Space", "P")
+	h.SendKeys("Space", "Down", "Space", "Down", "Space", "P")
 	h.WaitFor("Pause 3 deployments?", 10*time.Second)
 	h.SendKeys("Tab", "Enter")
 	h.Eventually(20*time.Second, "all deployments are paused", func() bool {
@@ -45,7 +45,7 @@ func TestDailyBulkSuspendCronJobs(t *testing.T) {
 	h.Kubectl("patch", "cronjob/daily-a", "-n", h.NS, "--type=merge", "-p", `{"spec":{"suspend":true}}`)
 	h.Start("-c", "cronjobs")
 	h.WaitFor(" daily-c ", 30*time.Second)
-	h.SendKeys("C-Space", "s")
+	h.SendKeys("Space", "Down", "Space", "Down", "Space", "s")
 	h.WaitFor("Suspend 3 cronjobs?", 10*time.Second)
 	h.SendKeys("Tab", "Enter")
 	h.Eventually(20*time.Second, "all cronjobs are suspended", func() bool {

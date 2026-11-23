@@ -278,7 +278,7 @@ func (h *H) SendKeys(keys ...string) {
 // Type sends literal text.
 func (h *H) Type(s string) {
 	h.t.Helper()
-	h.tmux("send-keys", "-t", h.session, "-l", s)
+	h.tmux("send-keys", "-t", h.session, "-l", "--", s)
 	time.Sleep(150 * time.Millisecond)
 }
 
