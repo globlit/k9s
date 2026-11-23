@@ -1294,7 +1294,7 @@ roleRef:
   name: k9s
   apiGroup: rbac.authorization.k8s.io
 ```
-
+ 
 ### Namespace RBAC scope
 
 If your users are constrained to certain namespaces, K9s will need to following role to enable read access to namespaced resources.
