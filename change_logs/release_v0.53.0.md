@@ -12,18 +12,18 @@ K9s Reloaded is a fork of [derailed/k9s](https://github.com/derailed/k9s), devel
 
 ## Resource Diagnostics
 
-* Show custom resource readiness through row colors and the `Ctrl-Z` faults filter. Use existing printer columns, or status conditions when full objects are already available. Metadata-only lists keep their existing API payloads. Set `readiness: false` for a GVR in `views.yaml` to disable these diagnostics. [19135f7b](https://github.com/globlit/k9s/commit/19135f7b)
+* Show custom resource readiness through row colors and the `Ctrl-Z` faults filter. [19135f7b](https://github.com/globlit/k9s/commit/19135f7b)
 * Add a `ROLLOUT` column to Deployments, StatefulSets and DaemonSets. Identify pending and progressing rollouts, paused Deployments, stalled Deployments and quota failures. [bf57f1fa](https://github.com/globlit/k9s/commit/bf57f1fa)
-* Show ResourceQuota usage, limits and the highest utilization percentage. Apply warning and critical thresholds, and expose critical quotas through the faults filter. Show CPU and memory defaults, requests and bounds for LimitRanges. [6251cff1](https://github.com/globlit/k9s/commit/6251cff1)
-* Open events for the selected resource with `Shift-E`. Scope events by UID and namespace, including custom resources. Use `Ctrl-Z` to show warnings. Child-resource events are not included. [6c9b27bf](https://github.com/globlit/k9s/commit/6c9b27bf)
+* Show ResourceQuota usage, limits and the highest utilization percentage. Apply warning and critical thresholds, and expose critical quotas. Show CPU and memory defaults, requests and bounds for LimitRanges. [6251cff1](https://github.com/globlit/k9s/commit/6251cff1)
+* Open events for the selected resource with `Shift-E`.  Use `Ctrl-Z` to show warnings (Child-resource events are not included). [6c9b27bf](https://github.com/globlit/k9s/commit/6c9b27bf)
 
 ---
 
 ## Structured JSON Logs
 
-Toggle JSON rendering with `Shift-J`. Keys and values use distinct colors; levels use severity colors, and nested values stay compact. Non-JSON lines retain plain rendering. [49057673](https://github.com/globlit/k9s/commit/49057673)
+Toggle JSON rendering with `Shift-J`. Non-JSON lines retain plain rendering for now. [49057673](https://github.com/globlit/k9s/commit/49057673)
 
-Filter parsed fields with `-j level=error` or combine predicates with `-j level=error,msg~timeout`. JSON parsing is lazy and cached. JSON mode remains off by default.
+Filter parsed fields with `-j level=error` or combine predicates with `-j level=error,msg~timeout`.
 
 To enable it at startup and project selected fields, add this to `config.yaml`:
 
@@ -42,7 +42,7 @@ Omit `jsonFields` to show all fields. Hidden fields are counted in a `…+N` mar
 
 * Press `Shift-D` in ReplicaSets to compare the selection with the Deployment's current template, or mark two ReplicaSets to compare them. Ignore generated pod-template hashes and Deployment bookkeeping annotations.
 * Press `Shift-D` in Helm history to compare the selection with the previous stored revision, or mark two revisions. Press `m` in the diff to switch between values and rendered manifests.
-* Search colored unified diffs using the existing details-view controls. Native Helm revision diffs do not require the Helm diff plugin. [00eaa1ba](https://github.com/globlit/k9s/commit/00eaa1ba) [2db120ff](https://github.com/globlit/k9s/commit/2db120ff)
+* Search colored unified diffs using the existing details-view controls. [00eaa1ba](https://github.com/globlit/k9s/commit/00eaa1ba) [2db120ff](https://github.com/globlit/k9s/commit/2db120ff)
 
 ---
 
@@ -58,11 +58,11 @@ Omit `jsonFields` to show all fields. Hidden fields are counted in a `…+N` mar
 | Logs | `Shift-J` | Toggle JSON rendering |
 | ReplicaSets / Helm history | `Shift-D` | Open a revision diff |
 
-* Debug containers use `kubectl debug` with an image and profile form. Defaults are `busybox:1.37.0` and `general`; configure them under `k9s.debugContainer`. The action preserves connection and impersonation settings and is hidden in read-only mode. [2dcbd62f](https://github.com/globlit/k9s/commit/2dcbd62f)
+* Debug containers use `kubectl debug` with an image and profile form. [2dcbd62f](https://github.com/globlit/k9s/commit/2dcbd62f)
 * Bulk pause and suspend actions use one confirmation. If any selected workload is active, pause or suspend all selections; otherwise resume them. [2c923dc7](https://github.com/globlit/k9s/commit/2c923dc7)
 * Add **Remove finalizers** to the delete dialog for terminating selections or when Force is enabled. Check object identity and permissions before removing `metadata.finalizers`. Namespace `spec.finalizers` are not supported. [fe9b99ca](https://github.com/globlit/k9s/commit/fe9b99ca)
 
-Native actions take precedence over conflicting plugin shortcuts by default. Reassign the watch-events and debug-container plugins if you still use them. In writable Deployment views, `Shift-P` now pauses or resumes workloads; use `Shift-O` to choose a sort column.
+Native actions take precedence over conflicting plugin shortcuts by default. In writable Deployment views, `Shift-P` now pauses or resumes workloads; use `Shift-O` to choose a sort column.
 
 ---
 
@@ -76,17 +76,9 @@ Native actions take precedence over conflicting plugin shortcuts by default. Rea
 
 ## Fixes and Performance
 
-* Use the supported Events v1 UID selector, fixing `field label not supported: involvedObject.uid`. [13f0eba6](https://github.com/globlit/k9s/commit/13f0eba6)
 * Keep event and diff reads on the context where the action started. Use a fresh client for CronJob suspend/resume after context changes. [0008f525](https://github.com/globlit/k9s/commit/0008f525) [23b7371d](https://github.com/globlit/k9s/commit/23b7371d) [7fc75417](https://github.com/globlit/k9s/commit/7fc75417)
 * Check workload UIDs before state changes and prevent late delete cleanup from affecting another view or context. [09b9865a](https://github.com/globlit/k9s/commit/09b9865a) [b7d6aa50](https://github.com/globlit/k9s/commit/b7d6aa50)
 * Apply configured API request timeouts to Helm clients. [2fa23e79](https://github.com/globlit/k9s/commit/2fa23e79)
-* Remove an extra per-line render allocation introduced by JSON formatting. [9cc2bbda](https://github.com/globlit/k9s/commit/9cc2bbda)
-
----
-
-## Validation
-
-Unit and component tests passed with the race detector. Log rendering and filtering benchmarks were compared with v0.52.1-era code. E2E scenarios compile but have not yet been run.
 
 ---
 
