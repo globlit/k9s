@@ -1,13 +1,13 @@
 name: K9s Test
 
 on:
+  workflow_call:
   workflow_dispatch:
   push:
     branches:
       - master
     tags:
       - rc*
-      - v*
   pull_request:
     branches:
       - master

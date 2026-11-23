@@ -1,6 +1,7 @@
 name: K9s E2E
 
 on:
+  workflow_call:
   workflow_dispatch:
   push:
     branches:
@@ -64,4 +65,5 @@ jobs:
           name: e2e-captures
           path: ${{ env.K9S_E2E_ARTIFACTS }}
           if-no-files-found: ignore
+          include-hidden-files: true
           retention-days: 7

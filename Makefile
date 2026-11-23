@@ -1,5 +1,5 @@
 NAME            := k9s
-VERSION         ?= v0.52.1
+VERSION         ?= v0.53.0
 PACKAGE         := github.com/globlit/$(NAME)
 OUTPUT_BIN      ?= execs/${NAME}
 GO_FLAGS        ?=
