@@ -12,11 +12,28 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	appsv1 "k8s.io/api/apps/v1"
 )
 
 // These cases are prepared for the isolated kind harness; they are not unit tests.
 func TestDailyBulkPauseDeployments(t *testing.T) {
 	h := New(t)
+	allPaused := func(want bool) bool {
+		var deployments appsv1.DeploymentList
+		if err := json.Unmarshal([]byte(h.Kubectl("get", "deployments", "-n", h.NS, "-o", "json")), &deployments); err != nil {
+			t.Fatal(err)
+		}
+		if len(deployments.Items) != 3 {
+			return false
+		}
+		for _, deployment := range deployments.Items {
+			if deployment.Spec.Paused != want {
+				return false
+			}
+		}
+		return true
+	}
 	for _, name := range []string{"daily-a", "daily-b", "daily-c"} {
 		h.Kubectl("create", "deployment", name, "-n", h.NS, "--image=busybox:1.37.0", "--replicas=0")
 	}
@@ -27,13 +44,13 @@ func TestDailyBulkPauseDeployments(t *testing.T) {
 	h.WaitFor("Pause 3 deployments?", 10*time.Second)
 	h.SendKeys("Tab", "Enter")
 	h.Eventually(20*time.Second, "all deployments are paused", func() bool {
-		return h.Kubectl("get", "deployments", "-n", h.NS, "-o", "jsonpath={.items[*].spec.paused}") == "true true true"
+		return allPaused(true)
 	})
 	h.SendKeys("P")
 	h.WaitFor("Resume 3 deployments?", 10*time.Second)
 	h.SendKeys("Tab", "Enter")
 	h.Eventually(20*time.Second, "all deployments are resumed", func() bool {
-		return h.Kubectl("get", "deployments", "-n", h.NS, "-o", "jsonpath={.items[*].spec.paused}") == "false false false"
+		return allPaused(false)
 	})
 }
 
