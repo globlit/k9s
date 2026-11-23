@@ -36,7 +36,8 @@ var ExitStatus = ""
 const (
 	splashDelay      = 1 * time.Second
 	clusterRefresh   = 15 * time.Second
-	clusterInfoWidth = 50
+	headerHeight     = 7
+	clusterInfoWidth = 40
 	clusterInfoPad   = 15
 )
 
@@ -57,6 +58,7 @@ type App struct {
 	showHeader      bool
 	showLogo        bool
 	showCrumbs      bool
+	footer          *tview.Flex
 }
 
 // NewApp returns a K9s app instance.
@@ -173,9 +175,8 @@ func (a *App) layout(ctx context.Context) {
 	main.AddItem(a.statusIndicator(), 1, 1, false)
 	main.AddItem(a.Content, 0, 10, true)
 	a.showCrumbs = !a.Config.K9s.IsCrumbsless()
-	if a.showCrumbs {
-		main.AddItem(a.Crumbs(), 1, 1, false)
-	}
+	a.footer = tview.NewFlex()
+	a.Logo().SetCompact()
 	main.AddItem(flash, 1, 1, false)
 
 	a.Main.AddPage("main", main, true, false)
@@ -304,27 +305,45 @@ func (a *App) toggleHeader(header, logo bool) {
 	}
 	if a.showHeader {
 		flex.RemoveItemAtIndex(0)
-		flex.AddItemAtIndex(0, a.buildHeader(), ui.LogoArtHeight+1, 1, false)
+		flex.AddItemAtIndex(0, a.buildHeader(), headerHeight, 1, false)
 	} else {
 		flex.RemoveItemAtIndex(0)
 		flex.AddItemAtIndex(0, a.statusIndicator(), 1, 1, false)
 	}
+	a.updateFooter()
 }
 
 func (a *App) toggleCrumbs(flag bool) {
 	a.showCrumbs = flag
+	a.updateFooter()
+}
+
+func (a *App) updateFooter() {
 	flex, ok := a.Main.GetPrimitive("main").(*tview.Flex)
 	if !ok {
 		slog.Error("Expecting valid flex view main panel. Exiting!")
 		os.Exit(1)
 	}
-	if a.showCrumbs {
-		if _, ok := flex.ItemAt(2).(*ui.Crumbs); !ok {
-			flex.AddItemAtIndex(2, a.Crumbs(), 1, 1, false)
-		}
-	} else {
-		flex.RemoveItemAtIndex(2)
+	flex.RemoveItem(a.footer)
+	a.footer.Clear()
+	if !a.showCrumbs && !a.showLogo {
+		return
 	}
+	if a.showCrumbs {
+		a.footer.AddItem(a.Crumbs(), 0, 1, false)
+	}
+	if a.showLogo {
+		width := 0
+		if a.showCrumbs {
+			width = ui.LogoWidth
+		}
+		a.footer.AddItem(a.Logo(), width, 1, false)
+	}
+	index := 2
+	if flex.ItemAt(1) == a.Prompt() {
+		index++
+	}
+	flex.AddItemAtIndex(index, a.footer, 1, 1, false)
 }
 
 func (a *App) buildHeader() tview.Primitive {
@@ -347,9 +366,6 @@ func (a *App) buildHeader() tview.Primitive {
 	}
 	header.AddItem(a.clusterInfo(), clWidth, 1, false)
 	header.AddItem(a.Menu(), 0, 1, false)
-	if a.showLogo {
-		header.AddItem(a.Logo(), ui.LogoWidth, 0, false)
-	}
 	return header
 }
 

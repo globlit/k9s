@@ -28,6 +28,7 @@ type Logo struct {
 	logo, status *tview.TextView
 	lines        []string
 	styles       *config.Styles
+	compact      bool
 	mx           sync.Mutex
 }
 
@@ -48,6 +49,19 @@ func NewLogo(styles *config.Styles) *Logo {
 	styles.AddListener(&l)
 
 	return &l
+}
+
+// SetCompact places the status and a one-line logo on the same row.
+func (l *Logo) SetCompact() {
+	l.mx.Lock()
+	defer l.mx.Unlock()
+	l.compact = true
+	l.Clear()
+	l.SetDirection(tview.FlexColumn)
+	l.AddItem(l.status, 0, 1, false)
+	l.AddItem(l.logo, 8, 0, false)
+	l.logo.SetTextAlign(tview.AlignRight)
+	l.refreshLogo(l.styles.Body().LogoColor)
 }
 
 // Logo returns the logo viewer.
@@ -145,9 +159,13 @@ func (l *Logo) refreshStatus(msg string, c config.Color) {
 
 func (l *Logo) refreshLogo(c config.Color) {
 	l.logo.Clear()
-	for i, s := range l.lines {
+	lines := l.lines
+	if l.compact && len(lines) != 1 {
+		lines = []string{"<K9s>"}
+	}
+	for i, s := range lines {
 		_, _ = fmt.Fprintf(l.logo, "[%s::b]%s", c, tview.Escape(s))
-		if i+1 < len(l.lines) {
+		if i+1 < len(lines) {
 			_, _ = fmt.Fprintf(l.logo, "\n")
 		}
 	}

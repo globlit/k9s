@@ -16,7 +16,6 @@ import (
 
 	"github.com/globlit/k9s/internal"
 	"github.com/globlit/k9s/internal/client"
-	"github.com/globlit/k9s/internal/config/data"
 	"github.com/globlit/k9s/internal/dao"
 	"github.com/globlit/k9s/internal/model"
 	"github.com/globlit/k9s/internal/model1"
@@ -31,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
+
+const namespaceShortcutLimit = 5
 
 // Browser represents a generic resource browser.
 type Browser struct {
@@ -741,7 +742,7 @@ func (b *Browser) namespaceActions(aa *ui.KeyActions) {
 		aa.Add(ui.KeyW, ui.NewKeyAction("Warp To Namespace", b.nsWarpCmd, true))
 	}
 
-	b.namespaces = make(map[int]string, data.MaxFavoritesNS)
+	b.namespaces = make(map[int]string, namespaceShortcutLimit)
 	var index int
 	if ok, _ := b.app.Conn().CanI(client.NamespaceAll, client.NsGVR, "", client.ListAccess); ok {
 		aa.Add(ui.Key0, ui.NewKeyAction(client.NamespaceAll, b.switchNamespaceCmd, true))
@@ -750,6 +751,9 @@ func (b *Browser) namespaceActions(aa *ui.KeyActions) {
 	}
 	favNamespaces := b.app.Config.FavNamespaces()
 	for _, ns := range favNamespaces {
+		if index >= namespaceShortcutLimit {
+			break
+		}
 		if ns == client.NamespaceAll {
 			continue
 		}

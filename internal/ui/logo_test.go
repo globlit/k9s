@@ -31,6 +31,28 @@ func TestLogoCustomArt(t *testing.T) {
 	assert.Equal(t, "[#ffa500::b]AB\n[#ffa500::b] C\n", v.Logo().GetText(false))
 }
 
+func TestCompactLogo(t *testing.T) {
+	screen := tcell.NewSimulationScreen("UTF-8")
+	require.NoError(t, screen.Init())
+	t.Cleanup(screen.Fini)
+	screen.SetSize(ui.LogoWidth, 1)
+	v := ui.NewLogo(config.NewStyles())
+	v.SetCompact()
+	v.SetRect(0, 0, ui.LogoWidth, 1)
+	v.Warn("Dial K8s Toast")
+	v.Draw(screen)
+	var line strings.Builder
+	for x := range ui.LogoWidth {
+		r, _, _, _ := screen.GetContent(x, 0)
+		line.WriteRune(r)
+	}
+	assert.Contains(t, line.String(), "Dial K8s Toast")
+	assert.True(t, strings.HasSuffix(line.String(), "<K9s>"))
+	_, _, style, _ := screen.GetContent(ui.LogoWidth-1, 0)
+	fg, _, _ := style.Decompose()
+	assert.Equal(t, config.NewStyles().Body().LogoColorWarn.Color(), fg)
+}
+
 func TestLogoRendering(t *testing.T) {
 	for name, tc := range map[string]struct {
 		art  string

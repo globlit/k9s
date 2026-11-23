@@ -37,7 +37,7 @@ func drawHeaderTest(main *tview.Flex, screen tcell.SimulationScreen, width, heig
 	main.Draw(screen)
 }
 
-func TestHeaderNarrowTerminalPreservesLogoAndStatus(t *testing.T) {
+func TestFooterPreservesLogoAndStatus(t *testing.T) {
 	a, main, screen := newHeaderTestApp(t)
 	for _, art := range []string{"", "CUSTOM"} {
 		a.Logo().SetLogo(art)
@@ -50,8 +50,13 @@ func TestHeaderNarrowTerminalPreservesLogoAndStatus(t *testing.T) {
 				assert.Equal(t, ui.LogoWidth, w)
 				assert.Equal(t, width-ui.LogoWidth, x)
 				_, y, _, h := a.Logo().Status().GetRect()
-				assert.Equal(t, ui.LogoArtHeight, y)
+				_, crumbY, _, _ := a.Crumbs().GetRect()
+				assert.Equal(t, crumbY, y)
+				assert.Equal(t, 18, y)
 				assert.Equal(t, 1, h)
+				menuX, _, menuWidth, _ := a.Menu().GetRect()
+				assert.Equal(t, 40, menuX)
+				assert.Equal(t, width, menuX+menuWidth)
 				var status strings.Builder
 				for col := x; col < x+w; col++ {
 					r, _, _, _ := screen.GetContent(col, y)
@@ -59,6 +64,38 @@ func TestHeaderNarrowTerminalPreservesLogoAndStatus(t *testing.T) {
 				}
 				assert.Contains(t, status.String(), "Dial K8s Toast")
 			}
+		}
+	}
+}
+
+func TestFooterTogglesPreserveContentAndPrompt(t *testing.T) {
+	a, main, screen := newHeaderTestApp(t)
+	flash := main.ItemAt(3)
+	main.AddItemAtIndex(1, a.Prompt(), 3, 1, false)
+	for _, tc := range []struct{ header, logo, crumbs bool }{
+		{true, true, false},
+		{true, false, false},
+		{false, true, true},
+		{false, false, true},
+		{true, true, true},
+	} {
+		a.toggleHeader(tc.header, tc.logo)
+		a.toggleCrumbs(tc.crumbs)
+		a.toggleCrumbs(tc.crumbs)
+		drawHeaderTest(main, screen, 80, 20)
+		assert.Same(t, a.Prompt(), main.ItemAt(1))
+		assert.Same(t, a.Content, main.ItemAt(2))
+		if tc.logo || tc.crumbs {
+			assert.Same(t, a.footer, main.ItemAt(3))
+			assert.Same(t, flash, main.ItemAt(4))
+		} else {
+			assert.Same(t, flash, main.ItemAt(3))
+		}
+		if tc.logo {
+			x, y, w, h := a.Logo().Logo().GetRect()
+			assert.Equal(t, 80, x+w)
+			assert.Equal(t, 18, y)
+			assert.Equal(t, 1, h)
 		}
 	}
 }
