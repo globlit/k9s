@@ -9,12 +9,16 @@ for changes and offers subsequent commands to interact with your observed resour
 
 ---
 
-## Note...
+## About This Fork
 
-K9s is not pimped out by a big corporation with deep pockets.
-It is a complex OSS project that demands a lot of my time to maintain and support.
-K9s will always remain OSS and therefore free! That said, if you feel k9s makes your day to day Kubernetes journey a tad brighter, saves you time and makes you more productive, please consider [sponsoring us!](https://github.com/sponsors/derailed)
-Your donations will go a long way in keeping our servers lights on and beers in our fridge!
+This fork focuses on bug fixes and features for day-to-day use.
+Its changes are developed entirely with AI coding tools. Since this is a
+"vibe-coded" fork, I do not plan to submit these changes as pull requests to the
+upstream project.
+
+If you would like to support K9s, please visit [derailed/k9s](https://github.com/derailed/k9s)
+and consider [sponsoring the upstream maintainer](https://github.com/sponsors/derailed).
+All credit for the original project goes to its maintainers and contributors.
 
 **Thank you!**
 
